@@ -1,0 +1,2379 @@
+{
+  "rules": {
+    "AvoidMessageDigestField": {
+      "id": "AvoidMessageDigestField",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "You shouldn't declare field of MessageDigest type, because unsynchronized access could cause problems",
+      "description": "Declaring a MessageDigest instance as a field make this instance directly available to multiple threads. Such sharing of MessageDigest instances should be avoided if possible since it leads to wrong results if the access is not synchronized correctly. Just create a new instance and use it locally, where you need it. Creating a new instance is easier than synchronizing access to a shared instance.",
+      "priority": 3,
+      "xpath": "//FieldDeclaration/ClassType[pmd-java:typeIs('java.security.MessageDigest')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FieldDeclaration/ClassType[pmd-java:typeIs('java.security.MessageDigest')]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/AvoidMessageDigestField"
+    },
+    "AvoidPrintStackTrace": {
+      "id": "AvoidPrintStackTrace",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Avoid printStackTrace(); use a logger call instead.",
+      "description": "Avoid printStackTrace(); use a logger call instead.",
+      "priority": 3,
+      "xpath": "//MethodCall[ pmd-java:matchesSig(\"java.lang.Throwable#printStackTrace()\") ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[ pmd-java:matchesSig(\"java.lang.Throwable#printStackTrace()\") ]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/AvoidPrintStackTrace"
+    },
+    "AvoidStringBufferField": {
+      "id": "AvoidStringBufferField",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "StringBuffers can grow quite a lot, and so may become a source of memory leak (if the owning class has a long life time).",
+      "description": "StringBuffers/StringBuilders can grow considerably, and so may become a source of memory leaks if held within objects with long lifetimes.",
+      "priority": 3,
+      "xpath": "//FieldDeclaration/ClassType[pmd-java:typeIs('java.lang.StringBuffer') or pmd-java:typeIs('java.lang.StringBuilder')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FieldDeclaration/ClassType[pmd-java:typeIs('java.lang.StringBuffer') or pmd-java:typeIs('java.lang.StringBuilder')]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/AvoidStringBufferField"
+    },
+    "DefaultLabelNotLastInSwitch": {
+      "id": "DefaultLabelNotLastInSwitch",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "The default label should be the last label in a switch statement or expression",
+      "description": "By convention, the default label should be the last label in a switch statement or switch expression. Note: This rule has been renamed from \"DefaultLabelNotLastInSwitchStmt\" with PMD 7.7.0.",
+      "priority": 3,
+      "xpath": "//SwitchLabel[@Default = true() and not(.. is ../../*[last()])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//SwitchLabel[@Default = true() and not(.. is ../../*[last()])]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/DefaultLabelNotLastInSwitch"
+    },
+    "DoubleBraceInitialization": {
+      "id": "DoubleBraceInitialization",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Double-brace initialization should be avoided",
+      "description": "Double brace initialisation is a pattern to initialise eg collections concisely. But it implicitly generates a new .class file, and the object holds a strong reference to the enclosing object. For those reasons, it is preferable to initialize the object normally, even though it's verbose. This rule counts any anonymous class which only has a single initializer as an instance of double-brace initialization. There is currently no way to find out whether a method called in the initializer is not accessible from outside the anonymous class, and those legit cases should be suppressed for the time being.",
+      "priority": 3,
+      "xpath": "//ConstructorCall/AnonymousClassDeclaration/ClassBody[count(*)=1]/Initializer[@Static=false()]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ConstructorCall/AnonymousClassDeclaration/ClassBody[count(*)=1]/Initializer[@Static=false()]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/DoubleBraceInitialization"
+    },
+    "EnumComparison": {
+      "id": "EnumComparison",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Enums should be compared using ==",
+      "description": "When comparing enums, `equals()` should be avoided and `==` should be preferred. Using `==` has some advantages: * same semantic as `equals()` * less problematic with possible null pointer exceptions * supports static type check: If you compare two incompatible enum types, the compiler will tell you. When using equals, you'll only get noticed at runtime or not at all. This rule implements SonarSource rule [S4551](https://sonarsource.github.io/rspec/#/rspec/S4551). Note, that only primitive types and enums should be compared using `==`. To compare other objects, `equals()` is the correct way. See {%rule java/errorprone/CompareObjectsWithEquals %} and {%rule java/errorprone/UseEqualsToCompareStrings %}.",
+      "priority": 3,
+      "xpath": "//MethodCall[pmd-java:matchesSig(\"_#equals(java.lang.Object)\")]\n  [*[pmd-java:typeIs(\"java.lang.Enum\")] or\n   ArgumentList[*[pmd-java:typeIs(\"java.lang.Enum\")]]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[pmd-java:matchesSig(\"_#equals(java.lang.Object)\")]\n  [*[pmd-java:typeIs(\"java.lang.Enum\")] or\n   ArgumentList[*[pmd-java:typeIs(\"java.lang.Enum\")]]]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/EnumComparison"
+    },
+    "ExhaustiveSwitchHasDefault": {
+      "id": "ExhaustiveSwitchHasDefault",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "The switch block is exhaustive even without the default case",
+      "description": "When switching over an enum or sealed class, the compiler will ensure that all possible cases are covered. If a case is missing, this will result in a compilation error. But if a default case is added, this compiler check is not performed anymore, leading to difficulties in noticing bugs at runtime. Not using a default case makes sure, a compiler error is introduced whenever a new enum constant or a new subclass to the sealed class hierarchy is added. We will discover this problem at compile time rather than at runtime (if at all). Note: The fix it not necessarily just removing the default case. Maybe a case is missing which needs to be implemented.",
+      "priority": 3,
+      "xpath": "//(SwitchStatement | SwitchExpression)\n                      [@Exhaustive = true()]\n                      [@DefaultCase = true()]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//(SwitchStatement | SwitchExpression)\n                      [@Exhaustive = true()]\n                      [@DefaultCase = true()]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/ExhaustiveSwitchHasDefault"
+    },
+    "JUnit4SuitesShouldUseSuiteAnnotation": {
+      "id": "JUnit4SuitesShouldUseSuiteAnnotation",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "JUnit 4 indicates test suites via annotations, not the suite method.",
+      "description": "In JUnit 3, test suites are indicated by the suite() method. In JUnit 4, suites are indicated through the @RunWith(Suite.class) annotation.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[@Name='suite' and ClassType[pmd-java:typeIs('junit.framework.Test')]]\n                   [not(.//ReturnStatement/*[pmd-java:typeIs('junit.framework.JUnit4TestAdapter')])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Name='suite' and ClassType[pmd-java:typeIs('junit.framework.Test')]]\n                   [not(.//ReturnStatement/*[pmd-java:typeIs('junit.framework.JUnit4TestAdapter')])]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/JUnit4SuitesShouldUseSuiteAnnotation"
+    },
+    "JUnit5TestShouldBePackagePrivate": {
+      "id": "JUnit5TestShouldBePackagePrivate",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "JUnit 5 tests should be package-private.",
+      "description": "Reports JUnit 5 test classes and methods that are not package-private. Contrary to JUnit 4 tests, which required public visibility to be run by the engine, JUnit 5 tests can also be run if they're package-private. Marking them as such is a good practice to limit their visibility. Test methods are identified as those which use `@Test`, `@RepeatedTest`, `@TestFactory`, `@TestTemplate` or `@ParameterizedTest`.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration[\n    (: a Junit 5 test class, ie, it has methods with the annotation :)\n    @Interface = false() and\n    ClassBody/MethodDeclaration\n    [ModifierList/Annotation[\n               pmd-java:typeIs('org.junit.jupiter.api.Test')\n            or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')\n            or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')\n            or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')\n            or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')\n    ]]\n]/(\n       self::*[@Abstract = false() and @Visibility = (\"public\", \"protected\")]\n|      ClassBody/MethodDeclaration\n       [@Visibility = (\"public\", \"protected\")]\n       [ModifierList/Annotation[\n               pmd-java:typeIs('org.junit.jupiter.api.Test')\n            or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')\n            or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')\n            or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')\n            or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')\n       ]]\n)",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration[\n    (: a Junit 5 test class, ie, it has methods with the annotation :)\n    @Interface = false() and\n    ClassBody/MethodDeclaration\n    [ModifierList/Annotation[\n               pmd-java:typeIs('org.junit.jupiter.api.Test')\n            or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')\n            or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')\n            or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')\n            or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')\n    ]]\n]/(\n       self::*[@Abstract = false() and @Visibility = (\"public\", \"protected\")]\n|      ClassBody/MethodDeclaration\n       [@Visibility = (\"public\", \"protected\")]\n       [ModifierList/Annotation[\n               pmd-java:typeIs('org.junit.jupiter.api.Test')\n            or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')\n            or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')\n            or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')\n            or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')\n       ]]\n)"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/JUnit5TestShouldBePackagePrivate"
+    },
+    "NonExhaustiveSwitch": {
+      "id": "NonExhaustiveSwitch",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Switch statements or expressions should be exhaustive, add a default case (or missing enum branches)",
+      "description": "Switch statements should be exhaustive, to make their control flow easier to follow. This can be achieved by adding a `default` case, or, if the switch is on an enum type, by ensuring there is one switch branch for each enum constant. This rule doesn't consider Switch Statements, that use Pattern Matching, since for these the compiler already ensures that all cases are covered. The same is true for Switch Expressions, which are also not considered by this rule.",
+      "priority": 3,
+      "xpath": "//SwitchStatement\n                    (: exclude empty switches :)\n                    [count(*) > 1]\n                    [@DefaultCase = false()]\n                    [@ExhaustiveEnumSwitch = false()]\n                    (: exclude pattern tests - for these, the compiler will ensure exhaustiveness :)\n                    [not(*/SwitchLabel[@PatternLabel = true()])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//SwitchStatement\n                    (: exclude empty switches :)\n                    [count(*) > 1]\n                    [@DefaultCase = false()]\n                    [@ExhaustiveEnumSwitch = false()]\n                    (: exclude pattern tests - for these, the compiler will ensure exhaustiveness :)\n                    [not(*/SwitchLabel[@PatternLabel = true()])]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/NonExhaustiveSwitch"
+    },
+    "ReplaceEnumerationWithIterator": {
+      "id": "ReplaceEnumerationWithIterator",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Consider replacing this Enumeration with the newer java.util.Iterator",
+      "description": "Consider replacing Enumeration usages with the newer java.util.Iterator",
+      "priority": 3,
+      "xpath": "//ImplementsList/ClassType[pmd-java:typeIsExactly('java.util.Enumeration')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ImplementsList/ClassType[pmd-java:typeIsExactly('java.util.Enumeration')]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/ReplaceEnumerationWithIterator"
+    },
+    "ReplaceHashtableWithMap": {
+      "id": "ReplaceHashtableWithMap",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Consider replacing this Hashtable with the newer java.util.Map",
+      "description": "Consider replacing Hashtable usage with the newer java.util.Map if thread safety is not required.",
+      "priority": 3,
+      "xpath": "//ClassType[pmd-java:typeIsExactly('java.util.Hashtable')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassType[pmd-java:typeIsExactly('java.util.Hashtable')]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/ReplaceHashtableWithMap"
+    },
+    "ReplaceVectorWithList": {
+      "id": "ReplaceVectorWithList",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Consider replacing this Vector with the newer java.util.List",
+      "description": "Consider replacing Vector usages with the newer java.util.ArrayList if expensive thread-safe operations are not required.",
+      "priority": 3,
+      "xpath": "//ClassType[pmd-java:typeIsExactly('java.util.Vector')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassType[pmd-java:typeIsExactly('java.util.Vector')]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/ReplaceVectorWithList"
+    },
+    "SystemPrintln": {
+      "id": "SystemPrintln",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Usage of System.out/err",
+      "description": "References to System.(out|err).print are usually intended for debugging purposes and can remain in the codebase even in production code. By using a logger one can enable/disable this behaviour at will (and by priority) and avoid clogging the Standard out log.",
+      "priority": 2,
+      "xpath": "//MethodCall[ starts-with(@MethodName, 'print') ]\n  /FieldAccess[ @Name = ('err', 'out') ]\n  /TypeExpression[ pmd-java:typeIsExactly('java.lang.System') ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[ starts-with(@MethodName, 'print') ]\n  /FieldAccess[ @Name = ('err', 'out') ]\n  /TypeExpression[ pmd-java:typeIsExactly('java.lang.System') ]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/SystemPrintln"
+    },
+    "UnitTestShouldUseAfterAnnotation": {
+      "id": "UnitTestShouldUseAfterAnnotation",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Apply the correct annotation if this method is used to clean up the tests",
+      "description": "This rule detects methods called `tearDown()` that are not properly annotated as a cleanup method. This is primarily intended to assist in upgrading from JUnit 3, where tear down methods were required to be called `tearDown()`. To a lesser extent, this may help detect omissions even under newer JUnit versions or under TestNG, as long as you are following this convention to name the methods. * JUnit 4 will only execute methods annotated with `@After` after running each test. * JUnit 5 introduced `@AfterEach` and `@AfterAll` annotations to execute methods after each test or after all tests in the class, respectively. * TestNG provides the annotations `@AfterMethod` and `@AfterClass` to execute methods after each test or after tests in the class, respectively. Note: This rule was named JUnit4TestShouldUseAfterAnnotation before PMD 7.7.0.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[@Name='tearDown' and @Arity=0]\n    [not(ModifierList/Annotation[\n           pmd-java:typeIs('org.junit.After')\n        or pmd-java:typeIs('org.junit.jupiter.api.AfterEach')\n        or pmd-java:typeIs('org.junit.jupiter.api.AfterAll')\n        or pmd-java:typeIs('org.testng.annotations.AfterClass')\n        or pmd-java:typeIs('org.testng.annotations.AfterMethod')\n    ])]\n    (: Make sure this is a JUnit 4/5 or TestNG class :)\n    [../MethodDeclaration[\n            pmd-java:hasAnnotation('org.junit.Test')\n         or pmd-java:hasAnnotation('org.junit.jupiter.api.Test')\n         or pmd-java:hasAnnotation('org.testng.annotations.Test')\n    ]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Name='tearDown' and @Arity=0]\n    [not(ModifierList/Annotation[\n           pmd-java:typeIs('org.junit.After')\n        or pmd-java:typeIs('org.junit.jupiter.api.AfterEach')\n        or pmd-java:typeIs('org.junit.jupiter.api.AfterAll')\n        or pmd-java:typeIs('org.testng.annotations.AfterClass')\n        or pmd-java:typeIs('org.testng.annotations.AfterMethod')\n    ])]\n    (: Make sure this is a JUnit 4/5 or TestNG class :)\n    [../MethodDeclaration[\n            pmd-java:hasAnnotation('org.junit.Test')\n         or pmd-java:hasAnnotation('org.junit.jupiter.api.Test')\n         or pmd-java:hasAnnotation('org.testng.annotations.Test')\n    ]]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/UnitTestShouldUseAfterAnnotation"
+    },
+    "UnitTestShouldUseBeforeAnnotation": {
+      "id": "UnitTestShouldUseBeforeAnnotation",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Apply the correct annotation if this method is used to set up the tests",
+      "description": "This rule detects methods called `setUp()` that are not properly annotated as a setup method. This is primarily intended to assist in upgrading from JUnit 3, where setup methods were required to be called `setUp()`. To a lesser extent, this may help detect omissions even under newer JUnit versions or under TestNG, as long as you are following this convention to name the methods. * JUnit 4 will only execute methods annotated with `@Before` before all tests. * JUnit 5 introduced `@BeforeEach` and `@BeforeAll` annotations to execute methods before each test or before all tests in the class, respectively. * TestNG provides the annotations `@BeforeMethod` and `@BeforeClass` to execute methods before each test or before tests in the class, respectively. Note: This rule was named JUnit4TestShouldUseBeforeAnnotation before PMD 7.7.0.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[@Name='setUp' and @Arity=0]\n    [not(ModifierList/Annotation[\n           pmd-java:typeIs('org.junit.Before')\n        or pmd-java:typeIs('org.junit.jupiter.api.BeforeEach')\n        or pmd-java:typeIs('org.junit.jupiter.api.BeforeAll')\n        or pmd-java:typeIs('org.testng.annotations.BeforeMethod')\n        or pmd-java:typeIs('org.testng.annotations.BeforeClass')\n    ])]\n    (: Make sure this is a JUnit 4/5 or TestNG class :)\n    [../MethodDeclaration[\n               pmd-java:hasAnnotation('org.junit.Test')\n            or pmd-java:hasAnnotation('org.junit.jupiter.api.Test')\n            or pmd-java:hasAnnotation('org.testng.annotations.Test')\n    ]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Name='setUp' and @Arity=0]\n    [not(ModifierList/Annotation[\n           pmd-java:typeIs('org.junit.Before')\n        or pmd-java:typeIs('org.junit.jupiter.api.BeforeEach')\n        or pmd-java:typeIs('org.junit.jupiter.api.BeforeAll')\n        or pmd-java:typeIs('org.testng.annotations.BeforeMethod')\n        or pmd-java:typeIs('org.testng.annotations.BeforeClass')\n    ])]\n    (: Make sure this is a JUnit 4/5 or TestNG class :)\n    [../MethodDeclaration[\n               pmd-java:hasAnnotation('org.junit.Test')\n            or pmd-java:hasAnnotation('org.junit.jupiter.api.Test')\n            or pmd-java:hasAnnotation('org.testng.annotations.Test')\n    ]]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/UnitTestShouldUseBeforeAnnotation"
+    },
+    "UnusedLabel": {
+      "id": "UnusedLabel",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Avoid unused labels such as ''{0}''.",
+      "description": "Unused labeled are unnecessary and may be confusing as you might be wondering what this label is used for. To improve readability the unused label should simply be removed. This rule implements SonarSource rule [S1065](https://sonarsource.github.io/rspec/#/rspec/S1065).",
+      "priority": 3,
+      "xpath": "//LabeledStatement[let $label := @Label return\n      not( (.//BreakStatement | .//ContinueStatement)[@Label = $label] )\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//LabeledStatement[let $label := @Label return\n      not( (.//BreakStatement | .//ContinueStatement)[@Label = $label] )\n]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/UnusedLabel"
+    },
+    "UseStandardCharsets": {
+      "id": "UseStandardCharsets",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Please use StandardCharsets constants",
+      "description": "Starting with Java 7, StandardCharsets provides constants for common Charset objects, such as UTF-8. Using the constants is less error prone, and can provide a small performance advantage compared to `Charset.forName(...)` since no scan across the internal `Charset` caches is needed.",
+      "priority": 3,
+      "xpath": "//MethodCall[@MethodName = 'forName'][pmd-java:typeIs('java.nio.charset.Charset')]\n    [\n        ArgumentList/StringLiteral\n            [@Image = ('\"US-ASCII\"', '\"ISO-8859-1\"', '\"UTF-8\"', '\"UTF-16BE\"', '\"UTF-16LE\"', '\"UTF-16\"')]\n    ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[@MethodName = 'forName'][pmd-java:typeIs('java.nio.charset.Charset')]\n    [\n        ArgumentList/StringLiteral\n            [@Image = ('\"US-ASCII\"', '\"ISO-8859-1\"', '\"UTF-8\"', '\"UTF-16BE\"', '\"UTF-16LE\"', '\"UTF-16\"')]\n    ]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/UseStandardCharsets"
+    },
+    "UseVarargs": {
+      "id": "UseVarargs",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "Consider using varargs for methods or constructors which take an array the last parameter.",
+      "description": "Java 5 introduced the varargs parameter declaration for methods and constructors. This syntactic sugar provides flexibility for users of these methods and constructors, allowing them to avoid having to deal with the creation of an array. Byte arrays in any method and String arrays in `public static void main(String[])` methods are ignored.",
+      "priority": 4,
+      "xpath": "//FormalParameters[not(parent::MethodDeclaration[@Overridden=true() or @MainMethod=true()])]\n  /FormalParameter[position()=last()]\n   [@Varargs=false()]\n   [ArrayType[not(PrimitiveType[@Kind = \"byte\"] or ClassType[pmd-java:typeIs('java.lang.Byte')])]\n    or VariableId[ArrayDimensions] and (PrimitiveType[not(@Kind=\"byte\")] or ClassType[not(pmd-java:typeIs('java.lang.Byte'))])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FormalParameters[not(parent::MethodDeclaration[@Overridden=true() or @MainMethod=true()])]\n  /FormalParameter[position()=last()]\n   [@Varargs=false()]\n   [ArrayType[not(PrimitiveType[@Kind = \"byte\"] or ClassType[pmd-java:typeIs('java.lang.Byte')])]\n    or VariableId[ArrayDimensions] and (PrimitiveType[not(@Kind=\"byte\")] or ClassType[not(pmd-java:typeIs('java.lang.Byte'))])]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/UseVarargs"
+    },
+    "WhileLoopWithLiteralBoolean": {
+      "id": "WhileLoopWithLiteralBoolean",
+      "language": "java",
+      "category": "Best Practices",
+      "message": "The loop can be simplified.",
+      "description": "`do {} while (true);` requires reading the end of the statement before it is apparent that it loops forever, whereas `while (true) {}` is easier to understand. `do {} while (false);` is redundant, and if an inner variable scope is required, a block `{}` is sufficient. `while (false) {}` will never execute the block and can be removed in its entirety.",
+      "priority": 3,
+      "xpath": "(: while loops with single boolean literal 'false', maybe parenthesized :)\n//WhileStatement/BooleanLiteral[@True = false()]\n|\n(: do-while loops with single boolean literal ('false' or 'true'), maybe parenthesized :)\n//DoStatement/BooleanLiteral\n|\n(: while loops with conditional or'ed boolean literals, maybe parenthesized :)\n//WhileStatement[(InfixExpression[@Operator = ('|', '||')])\n    (: no var access :)\n    [count(VariableAccess) = 0]\n    (: at least one false literal :)\n    [count(BooleanLiteral[@True = false()]) >= 1]]\n|\n(: while loops with conditional and'ed boolean literals, maybe parenthesized :)\n//WhileStatement[(InfixExpression[@Operator = ('&', '&&')])\n    (: at least one false literal :)\n    [count(BooleanLiteral[@True = false()]) >= 1]]\n|\n(: do-while loops with conditional or'ed boolean literals, maybe parenthesized :)\n//DoStatement[(InfixExpression[@Operator = ('|', '||')])\n    (: at least one true literal :)\n    [count(BooleanLiteral[@True = true()]) >= 1\n      (: or only boolean literal and no no var access :)\n      or count(BooleanLiteral) >= 1\n      and count(VariableAccess) = 0\n    ]]\n|\n(: do-while loops with conditional and'ed boolean literals, maybe parenthesized :)\n//DoStatement[(InfixExpression[@Operator = ('&', '&&')])\n    (: at least one false literal :)\n    [count(BooleanLiteral[@True = false()]) >= 1\n      (: or only boolean literal and no no var access :)\n      or count(BooleanLiteral) >= 1\n      and count(VariableAccess) = 0\n    ]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "(: while loops with single boolean literal 'false', maybe parenthesized :)\n//WhileStatement/BooleanLiteral[@True = false()]\n|\n(: do-while loops with single boolean literal ('false' or 'true'), maybe parenthesized :)\n//DoStatement/BooleanLiteral\n|\n(: while loops with conditional or'ed boolean literals, maybe parenthesized :)\n//WhileStatement[(InfixExpression[@Operator = ('|', '||')])\n    (: no var access :)\n    [count(VariableAccess) = 0]\n    (: at least one false literal :)\n    [count(BooleanLiteral[@True = false()]) >= 1]]\n|\n(: while loops with conditional and'ed boolean literals, maybe parenthesized :)\n//WhileStatement[(InfixExpression[@Operator = ('&', '&&')])\n    (: at least one false literal :)\n    [count(BooleanLiteral[@True = false()]) >= 1]]\n|\n(: do-while loops with conditional or'ed boolean literals, maybe parenthesized :)\n//DoStatement[(InfixExpression[@Operator = ('|', '||')])\n    (: at least one true literal :)\n    [count(BooleanLiteral[@True = true()]) >= 1\n      (: or only boolean literal and no no var access :)\n      or count(BooleanLiteral) >= 1\n      and count(VariableAccess) = 0\n    ]]\n|\n(: do-while loops with conditional and'ed boolean literals, maybe parenthesized :)\n//DoStatement[(InfixExpression[@Operator = ('&', '&&')])\n    (: at least one false literal :)\n    [count(BooleanLiteral[@True = false()]) >= 1\n      (: or only boolean literal and no no var access :)\n      or count(BooleanLiteral) >= 1\n      and count(VariableAccess) = 0\n    ]]"
+        }
+      },
+      "sourceFiles": [
+        "bestpractices.xml"
+      ],
+      "ref": "category/java/bestpractices.xml/WhileLoopWithLiteralBoolean"
+    },
+    "AvoidDollarSigns": {
+      "id": "AvoidDollarSigns",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Avoid using dollar signs in variable/method/class/interface names",
+      "description": "Avoid using dollar signs in variable/method/class/interface names.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration           [contains(@SimpleName, '$')]\n    | //EnumDeclaration            [contains(@SimpleName, '$')]\n    | //AnnotationTypeDeclaration  [contains(@SimpleName, '$')]\n    | //RecordDeclaration          [contains(@SimpleName, '$')]\n    | //VariableId                 [contains(@Name, '$')]\n    | //MethodDeclaration          [contains(@Name, '$')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration           [contains(@SimpleName, '$')]\n    | //EnumDeclaration            [contains(@SimpleName, '$')]\n    | //AnnotationTypeDeclaration  [contains(@SimpleName, '$')]\n    | //RecordDeclaration          [contains(@SimpleName, '$')]\n    | //VariableId                 [contains(@Name, '$')]\n    | //MethodDeclaration          [contains(@Name, '$')]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/AvoidDollarSigns"
+    },
+    "AvoidProtectedFieldInFinalClass": {
+      "id": "AvoidProtectedFieldInFinalClass",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Avoid protected fields in a final class.  Change to private or package access.",
+      "description": "Do not use protected fields in final classes since they cannot be subclassed. Clarify your intent by using private or package access modifiers instead.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration[@Final = true()]\n/ClassBody\n/FieldDeclaration[@Visibility = \"protected\"]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration[@Final = true()]\n/ClassBody\n/FieldDeclaration[@Visibility = \"protected\"]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/AvoidProtectedFieldInFinalClass"
+    },
+    "AvoidProtectedMethodInFinalClassNotExtending": {
+      "id": "AvoidProtectedMethodInFinalClassNotExtending",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Avoid protected methods in a final class that doesn't extend anything other than Object.  Change to private or package access.",
+      "description": "Do not use protected methods in most final classes since they cannot be subclassed. This should only be allowed in final classes that extend other classes with protected methods (whose visibility cannot be reduced). Clarify your intent by using private or package access modifiers instead.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration[@Final= true() and not(ExtendsList)]\n/ClassBody\n/MethodDeclaration[@Visibility=\"protected\" and @Name != 'finalize']",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration[@Final= true() and not(ExtendsList)]\n/ClassBody\n/MethodDeclaration[@Visibility=\"protected\" and @Name != 'finalize']"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/AvoidProtectedMethodInFinalClassNotExtending"
+    },
+    "AvoidUsingNativeCode": {
+      "id": "AvoidUsingNativeCode",
+      "language": "java",
+      "category": "Code Style",
+      "message": "The use of native code is not recommended.",
+      "description": "Unnecessary reliance on Java Native Interface (JNI) calls directly reduces application portability and increases the maintenance burden.",
+      "priority": 2,
+      "xpath": "//MethodCall[TypeExpression/ClassType[pmd-java:typeIs('java.lang.System')]\n                                    and @MethodName = 'loadLibrary']",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[TypeExpression/ClassType[pmd-java:typeIs('java.lang.System')]\n                                    and @MethodName = 'loadLibrary']"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/AvoidUsingNativeCode"
+    },
+    "CallSuperInConstructor": {
+      "id": "CallSuperInConstructor",
+      "language": "java",
+      "category": "Code Style",
+      "message": "It is a good practice to call super() in a constructor",
+      "description": "It is a good practice to call super() in a constructor. If super() is not called but another constructor (such as an overloaded constructor) is called, this rule will not report it.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration[ExtendsList/*]\n  /ClassBody\n  /ConstructorDeclaration[ not(Block/ExplicitConstructorInvocation) ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration[ExtendsList/*]\n  /ClassBody\n  /ConstructorDeclaration[ not(Block/ExplicitConstructorInvocation) ]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/CallSuperInConstructor"
+    },
+    "EmptyMethodInAbstractClassShouldBeAbstract": {
+      "id": "EmptyMethodInAbstractClassShouldBeAbstract",
+      "language": "java",
+      "category": "Code Style",
+      "message": "An empty method in an abstract class should be abstract instead",
+      "description": "Empty or auto-generated methods in an abstract class should be tagged as abstract. This helps to remove their inappropriate usage by developers who should be implementing their own versions in the concrete subclasses.",
+      "priority": 1,
+      "xpath": "//ClassDeclaration[@RegularClass = true() and pmd-java:modifiers() = \"abstract\"]\n  /ClassBody\n    /MethodDeclaration\n    [@Final = false()]\n    [Block[\n      let $size := count(*[not(self::EmptyStatement)])\n      return $size = 0\n             or $size = 1 and ReturnStatement[NullLiteral\n                                              or NumericLiteral[@ValueAsInt = 0]\n                                              or StringLiteral[@Empty = true()]]\n    ]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration[@RegularClass = true() and pmd-java:modifiers() = \"abstract\"]\n  /ClassBody\n    /MethodDeclaration\n    [@Final = false()]\n    [Block[\n      let $size := count(*[not(self::EmptyStatement)])\n      return $size = 0\n             or $size = 1 and ReturnStatement[NullLiteral\n                                              or NumericLiteral[@ValueAsInt = 0]\n                                              or StringLiteral[@Empty = true()]]\n    ]]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/EmptyMethodInAbstractClassShouldBeAbstract"
+    },
+    "ExtendsObject": {
+      "id": "ExtendsObject",
+      "language": "java",
+      "category": "Code Style",
+      "message": "No need to explicitly extend Object.",
+      "description": "No need to explicitly extend Object.",
+      "priority": 4,
+      "xpath": "//ExtendsList/ClassType[pmd-java:typeIsExactly('java.lang.Object')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ExtendsList/ClassType[pmd-java:typeIsExactly('java.lang.Object')]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/ExtendsObject"
+    },
+    "FinalParameterInAbstractMethod": {
+      "id": "FinalParameterInAbstractMethod",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Final parameter in abstract method",
+      "description": "Declaring a method parameter as final for an interface method is useless because the implementation may choose to not respect it.",
+      "priority": 1,
+      "xpath": "//MethodDeclaration\n    [FormalParameters/FormalParameter[@Final = true()]]\n    [not(Block)]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration\n    [FormalParameters/FormalParameter[@Final = true()]]\n    [not(Block)]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/FinalParameterInAbstractMethod"
+    },
+    "ForLoopShouldBeWhileLoop": {
+      "id": "ForLoopShouldBeWhileLoop",
+      "language": "java",
+      "category": "Code Style",
+      "message": "This for loop could be simplified to a while loop",
+      "description": "Some for loops can be simplified to while loops, this makes them more concise.",
+      "priority": 3,
+      "xpath": "//ForStatement[not(ForInit | ForUpdate) and count(*) = 2]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ForStatement[not(ForInit | ForUpdate) and count(*) = 2]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/ForLoopShouldBeWhileLoop"
+    },
+    "GenericsNaming": {
+      "id": "GenericsNaming",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Generics names should be a one letter long and upper case.",
+      "description": "Names for references to generic values should be limited to a single uppercase letter. **Deprecated:** This rule is deprecated since PMD 7.17.0 and will be removed with PMD 8.0.0. This rule has been replaced by {% rule TypeParameterNamingConventions %}, which provides more comprehensive and configurable naming conventions for type parameters.",
+      "priority": 4,
+      "xpath": "//TypeParameter[\n  string-length(@Name) > 1\n  or\n  upper-case(@Name) != @Name\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//TypeParameter[\n  string-length(@Name) > 1\n  or\n  upper-case(@Name) != @Name\n]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/GenericsNaming"
+    },
+    "LocalHomeNamingConvention": {
+      "id": "LocalHomeNamingConvention",
+      "language": "java",
+      "category": "Code Style",
+      "message": "The Local Home interface of a Session EJB should be suffixed by 'LocalHome'",
+      "description": "The Local Home interface of a Session EJB should be suffixed by 'LocalHome'.",
+      "priority": 4,
+      "xpath": "//ClassDeclaration\n[\n    pmd-java:typeIs('javax.ejb.EJBLocalHome')\n    and not(ends-with(@SimpleName, 'LocalHome'))\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n[\n    pmd-java:typeIs('javax.ejb.EJBLocalHome')\n    and not(ends-with(@SimpleName, 'LocalHome'))\n]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/LocalHomeNamingConvention"
+    },
+    "LocalInterfaceSessionNamingConvention": {
+      "id": "LocalInterfaceSessionNamingConvention",
+      "language": "java",
+      "category": "Code Style",
+      "message": "The Local Interface of a Session EJB should be suffixed by 'Local'",
+      "description": "The Local Interface of a Session EJB should be suffixed by 'Local'.",
+      "priority": 4,
+      "xpath": "//ClassDeclaration\n[\n    pmd-java:typeIs('javax.ejb.EJBLocalObject')\n    and not(ends-with(@SimpleName, 'Local'))\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n[\n    pmd-java:typeIs('javax.ejb.EJBLocalObject')\n    and not(ends-with(@SimpleName, 'Local'))\n]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/LocalInterfaceSessionNamingConvention"
+    },
+    "MDBAndSessionBeanNamingConvention": {
+      "id": "MDBAndSessionBeanNamingConvention",
+      "language": "java",
+      "category": "Code Style",
+      "message": "SessionBean or MessageBean should be suffixed by Bean",
+      "description": "The EJB Specification states that any MessageDrivenBean or SessionBean should be suffixed by 'Bean'.",
+      "priority": 4,
+      "xpath": "//ClassDeclaration\n[\n    (pmd-java:typeIs('javax.ejb.SessionBean')\n     or pmd-java:typeIs('javax.ejb.MessageDrivenBean'))\n    and not(ends-with(@SimpleName, 'Bean'))\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n[\n    (pmd-java:typeIs('javax.ejb.SessionBean')\n     or pmd-java:typeIs('javax.ejb.MessageDrivenBean'))\n    and not(ends-with(@SimpleName, 'Bean'))\n]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/MDBAndSessionBeanNamingConvention"
+    },
+    "NoPackage": {
+      "id": "NoPackage",
+      "language": "java",
+      "category": "Code Style",
+      "message": "All classes, interfaces, enums and annotations must belong to a named package",
+      "description": "Detects when a class, interface, enum or annotation does not have a package definition.",
+      "priority": 3,
+      "xpath": "/CompilationUnit[not(PackageDeclaration)]/*[pmd-java:nodeIs(\"TypeDeclaration\")][1]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "/CompilationUnit[not(PackageDeclaration)]/*[pmd-java:nodeIs(\"TypeDeclaration\")][1]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/NoPackage"
+    },
+    "PackageCase": {
+      "id": "PackageCase",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Package name contains upper case characters",
+      "description": "Detects when a package definition contains uppercase characters.",
+      "priority": 3,
+      "xpath": "//PackageDeclaration[lower-case(@Name) != @Name]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//PackageDeclaration[lower-case(@Name) != @Name]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/PackageCase"
+    },
+    "RemoteInterfaceNamingConvention": {
+      "id": "RemoteInterfaceNamingConvention",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Remote Interface of a Session EJB should NOT be suffixed",
+      "description": "Remote Interface of a Session EJB should not have a suffix.",
+      "priority": 4,
+      "xpath": "//ClassDeclaration\n[\n    pmd-java:typeIs('javax.ejb.EJBObject')\n    and matches(@SimpleName, '.*(Session|EJB|Bean)$')\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n[\n    pmd-java:typeIs('javax.ejb.EJBObject')\n    and matches(@SimpleName, '.*(Session|EJB|Bean)$')\n]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/RemoteInterfaceNamingConvention"
+    },
+    "RemoteSessionInterfaceNamingConvention": {
+      "id": "RemoteSessionInterfaceNamingConvention",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Remote Home interface of a Session EJB should be suffixed by 'Home'",
+      "description": "A Remote Home interface type of a Session EJB should be suffixed by 'Home'.",
+      "priority": 4,
+      "xpath": "//ClassDeclaration\n[\n    pmd-java:typeIs('javax.ejb.EJBHome')\n    and not(ends-with(@SimpleName, 'Home'))\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n[\n    pmd-java:typeIs('javax.ejb.EJBHome')\n    and not(ends-with(@SimpleName, 'Home'))\n]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/RemoteSessionInterfaceNamingConvention"
+    },
+    "UnnecessarySemicolon": {
+      "id": "UnnecessarySemicolon",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Unnecessary semicolon",
+      "description": "Reports unnecessary semicolons (so called \"empty statements\" and \"empty declarations\"). These can be removed without changing the program. The Java grammar allows them for historical reasons, but they should be avoided. This rule will not report empty statements that are syntactically required, for instance, because they are the body of a control statement. This rule replaces EmptyStatementNotInLoop.",
+      "priority": 3,
+      "xpath": "(: empty declarations :)\n      //EmptyDeclaration\n      (: empty statements :)\n    | //Block/EmptyStatement",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "(: empty declarations :)\n      //EmptyDeclaration\n      (: empty statements :)\n    | //Block/EmptyStatement"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/UnnecessarySemicolon"
+    },
+    "UselessQualifiedThis": {
+      "id": "UselessQualifiedThis",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Useless qualified this usage in the same class.",
+      "description": "Reports qualified this usages in the same class.",
+      "priority": 3,
+      "xpath": "//ThisExpression/ClassType\n[ ancestor::*[pmd-java:nodeIs('TypeDeclaration')][1]/@SimpleName = ./@SimpleName ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ThisExpression/ClassType\n[ ancestor::*[pmd-java:nodeIs('TypeDeclaration')][1]/@SimpleName = ./@SimpleName ]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/UselessQualifiedThis"
+    },
+    "UseShortArrayInitializer": {
+      "id": "UseShortArrayInitializer",
+      "language": "java",
+      "category": "Code Style",
+      "message": "Array initialization can be written shorter",
+      "description": "When declaring and initializing array fields or variables, it is not necessary to explicitly create a new array using `new`. Instead one can simply define the initial content of the array as a expression in curly braces. E.g. `int[] x = new int[] { 1, 2, 3 };` can be written as `int[] x = { 1, 2, 3 };`.",
+      "priority": 3,
+      "xpath": "//VariableDeclarator\n    [VariableId[@TypeInferred = false() and @ArrayType = true()]]\n    [ArrayAllocation/ArrayInitializer]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//VariableDeclarator\n    [VariableId[@TypeInferred = false() and @ArrayType = true()]]\n    [ArrayAllocation/ArrayInitializer]"
+        }
+      },
+      "sourceFiles": [
+        "codestyle.xml"
+      ],
+      "ref": "category/java/codestyle.xml/UseShortArrayInitializer"
+    },
+    "AbstractClassWithoutAnyMethod": {
+      "id": "AbstractClassWithoutAnyMethod",
+      "language": "java",
+      "category": "Design",
+      "message": "No abstract method which means that the keyword is most likely used to prevent instantiation. Use a private or protected constructor instead.",
+      "description": "If an abstract class does not provide any methods, it may be acting as a simple data container that is not meant to be instantiated. In this case, it is probably better to use a private or protected constructor in order to prevent instantiation than make the class misleadingly abstract.",
+      "priority": 1,
+      "xpath": "//ClassDeclaration\n    [@Abstract = true() and @Interface = false()]\n    [ClassBody[not(ConstructorDeclaration | MethodDeclaration)]]\n    [not(pmd-java:hasAnnotation('com.google.auto.value.AutoValue')\n         or pmd-java:hasAnnotation('lombok.AllArgsConstructor')\n         or pmd-java:hasAnnotation('lombok.NoArgsConstructor')\n         or pmd-java:hasAnnotation('lombok.RequiredArgsConstructor'))\n    ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n    [@Abstract = true() and @Interface = false()]\n    [ClassBody[not(ConstructorDeclaration | MethodDeclaration)]]\n    [not(pmd-java:hasAnnotation('com.google.auto.value.AutoValue')\n         or pmd-java:hasAnnotation('lombok.AllArgsConstructor')\n         or pmd-java:hasAnnotation('lombok.NoArgsConstructor')\n         or pmd-java:hasAnnotation('lombok.RequiredArgsConstructor'))\n    ]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/AbstractClassWithoutAnyMethod"
+    },
+    "AvoidThrowingNewInstanceOfSameException": {
+      "id": "AvoidThrowingNewInstanceOfSameException",
+      "language": "java",
+      "category": "Design",
+      "message": "A catch statement that catches an exception only to wrap it in a new instance of the same type of exception and throw it should be avoided",
+      "description": "Catch blocks that merely rethrow a caught exception wrapped inside a new instance of the same type only add to code size and runtime complexity.",
+      "priority": 3,
+      "xpath": "//CatchClause\n    [count(Block/*) = 1]\n    [CatchParameter/ClassType/@SimpleName = Block/ThrowStatement/ConstructorCall/ClassType/@SimpleName]\n    [Block/ThrowStatement/ConstructorCall/ArgumentList/@Size = 1]\n    /Block/ThrowStatement/ConstructorCall",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//CatchClause\n    [count(Block/*) = 1]\n    [CatchParameter/ClassType/@SimpleName = Block/ThrowStatement/ConstructorCall/ClassType/@SimpleName]\n    [Block/ThrowStatement/ConstructorCall/ArgumentList/@Size = 1]\n    /Block/ThrowStatement/ConstructorCall"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/AvoidThrowingNewInstanceOfSameException"
+    },
+    "AvoidThrowingRawExceptionTypes": {
+      "id": "AvoidThrowingRawExceptionTypes",
+      "language": "java",
+      "category": "Design",
+      "message": "Avoid throwing raw exception type {0}.",
+      "description": "Avoid throwing certain exception types. Rather than throw a raw RuntimeException, Throwable, Exception, or Error, use a subclassed exception or error instead.",
+      "priority": 1,
+      "xpath": "//ThrowStatement//ConstructorCall\n /ClassType[\n pmd-java:typeIsExactly('java.lang.Throwable')\nor\n pmd-java:typeIsExactly('java.lang.Exception')\nor\n pmd-java:typeIsExactly('java.lang.Error')\nor\n pmd-java:typeIsExactly('java.lang.RuntimeException')\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ThrowStatement//ConstructorCall\n /ClassType[\n pmd-java:typeIsExactly('java.lang.Throwable')\nor\n pmd-java:typeIsExactly('java.lang.Exception')\nor\n pmd-java:typeIsExactly('java.lang.Error')\nor\n pmd-java:typeIsExactly('java.lang.RuntimeException')\n]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/AvoidThrowingRawExceptionTypes"
+    },
+    "AvoidUncheckedExceptionsInSignatures": {
+      "id": "AvoidUncheckedExceptionsInSignatures",
+      "language": "java",
+      "category": "Design",
+      "message": "A method or constructor should not explicitly declare unchecked exception {0} in its ''throws'' clause",
+      "description": "Reports unchecked exceptions in the `throws` clause of a method or constructor. Java doesn't force the caller to handle an unchecked exception, so it's unnecessary except for documentation. A better practice is to document the exceptional cases with a `@throws` Javadoc tag, which allows being more descriptive.",
+      "priority": 3,
+      "xpath": "//ThrowsList/ClassType[pmd-java:typeIs('java.lang.RuntimeException')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ThrowsList/ClassType[pmd-java:typeIs('java.lang.RuntimeException')]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/AvoidUncheckedExceptionsInSignatures"
+    },
+    "CollapsibleIfStatements": {
+      "id": "CollapsibleIfStatements",
+      "language": "java",
+      "category": "Design",
+      "message": "This if statement could be combined with its parent",
+      "description": "Reports nested 'if' statements that can be merged together by joining their conditions with a boolean `&&` operator in between.",
+      "priority": 3,
+      "xpath": "//IfStatement[@Else = false()]/IfStatement[@Else = false()]\n|\n//IfStatement[@Else = false()]/Block[count(*) = 1]/IfStatement[@Else = false()]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//IfStatement[@Else = false()]/IfStatement[@Else = false()]\n|\n//IfStatement[@Else = false()]/Block[count(*) = 1]/IfStatement[@Else = false()]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/CollapsibleIfStatements"
+    },
+    "DoNotExtendJavaLangError": {
+      "id": "DoNotExtendJavaLangError",
+      "language": "java",
+      "category": "Design",
+      "message": "Exceptions should not extend java.lang.Error",
+      "description": "Errors are system exceptions. Do not extend them.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration/ExtendsList/ClassType[pmd-java:typeIs('java.lang.Error')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration/ExtendsList/ClassType[pmd-java:typeIs('java.lang.Error')]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/DoNotExtendJavaLangError"
+    },
+    "LogicInversion": {
+      "id": "LogicInversion",
+      "language": "java",
+      "category": "Design",
+      "message": "Use opposite operator instead of the logic complement operator.",
+      "description": "Use opposite operator instead of negating the whole expression with a logic complement operator.",
+      "priority": 3,
+      "xpath": "//UnaryExpression[@Operator='!']/InfixExpression[@Operator = ('==', '!=', '<', '>', '<=', '>=')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//UnaryExpression[@Operator='!']/InfixExpression[@Operator = ('==', '!=', '<', '>', '<=', '>=')]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/LogicInversion"
+    },
+    "MutableStaticState": {
+      "id": "MutableStaticState",
+      "language": "java",
+      "category": "Design",
+      "message": "Do not use non-final non-private static fields",
+      "description": "Non-private static fields should be made constants (or immutable references) by declaring them final. Non-private non-final static fields break encapsulation and can lead to hard to find bugs, since these fields can be modified from anywhere within the program. Callers can trivially access and modify non-private non-final static fields. Neither accesses nor modifications can be guarded against, and newly set values cannot be validated. If you are using this rule, then you don't need this rule {% rule java/errorprone/AssignmentToNonFinalStatic %}.",
+      "priority": 3,
+      "xpath": "//FieldDeclaration[pmd-java:modifiers() = \"static\"][not(pmd-java:modifiers() = (\"private\", \"final\"))]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FieldDeclaration[pmd-java:modifiers() = \"static\"][not(pmd-java:modifiers() = (\"private\", \"final\"))]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/MutableStaticState"
+    },
+    "SimplifiedTernary": {
+      "id": "SimplifiedTernary",
+      "language": "java",
+      "category": "Design",
+      "message": "This conditional expression can be simplified with || or &&",
+      "description": "Reports ternary expression with the form `condition ? literalBoolean : foo` or `condition ? foo : literalBoolean`. These expressions can be simplified as follows: * `condition ? true : expr` simplifies to `condition || expr` * `condition ? false : expr` simplifies to `!condition && expr` * `condition ? expr : true` simplifies to `!condition || expr` * `condition ? expr : false` simplifies to `condition && expr`",
+      "priority": 3,
+      "xpath": "//ConditionalExpression[BooleanLiteral and not(NullLiteral)]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ConditionalExpression[BooleanLiteral and not(NullLiteral)]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/SimplifiedTernary"
+    },
+    "SimplifyBooleanExpressions": {
+      "id": "SimplifyBooleanExpressions",
+      "language": "java",
+      "category": "Design",
+      "message": "Avoid unnecessary comparisons in boolean expressions",
+      "description": "Avoid unnecessary comparisons in boolean expressions, they serve no purpose and impacts readability.",
+      "priority": 3,
+      "xpath": "//InfixExpression[@Operator = (\"==\", \"!=\")]/BooleanLiteral",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//InfixExpression[@Operator = (\"==\", \"!=\")]/BooleanLiteral"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/SimplifyBooleanExpressions"
+    },
+    "UseObjectForClearerAPI": {
+      "id": "UseObjectForClearerAPI",
+      "language": "java",
+      "category": "Design",
+      "message": "Rather than using a lot of String arguments, consider using a container object for those values.",
+      "description": "When you write a public method, you should be thinking in terms of an API. If your method is public, it means other class will use it, therefore, you want (or need) to offer a comprehensive and evolutive API. If you pass a lot of information as a simple series of Strings, you may think of using an Object to represent all those information. You'll get a simpler API (such as doWork(Workload workload), rather than a tedious series of Strings) and more importantly, if you need at some point to pass extra data, you'll be able to do so by simply modifying or extending Workload without any modification to your API.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[pmd-java:modifiers() = 'public']\n    [count(FormalParameters/FormalParameter[pmd-java:typeIs('java.lang.String')]) > 3]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[pmd-java:modifiers() = 'public']\n    [count(FormalParameters/FormalParameter[pmd-java:typeIs('java.lang.String')]) > 3]"
+        }
+      },
+      "sourceFiles": [
+        "design.xml"
+      ],
+      "ref": "category/java/design.xml/UseObjectForClearerAPI"
+    },
+    "UncommentedEmptyMethodBody": {
+      "id": "UncommentedEmptyMethodBody",
+      "language": "java",
+      "category": "Documentation",
+      "message": "Document empty method body",
+      "description": "Uncommented Empty Method Body finds instances where a method body does not contain statements, but there is no comment. By explicitly commenting empty method bodies it is easier to distinguish between intentional (commented) and unintentional empty methods.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration/Block[count(*) = 0 and @containsComment = false()]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration/Block[count(*) = 0 and @containsComment = false()]"
+        }
+      },
+      "sourceFiles": [
+        "documentation.xml"
+      ],
+      "ref": "category/java/documentation.xml/UncommentedEmptyMethodBody"
+    },
+    "AvoidAccessibilityAlteration": {
+      "id": "AvoidAccessibilityAlteration",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "You should not modify visibility of constructors, methods or fields using setAccessible()",
+      "description": "Methods such as `getDeclaredConstructors()`, `getDeclaredMethods()`, and `getDeclaredFields()` also return private constructors, methods and fields. These can be made accessible by calling `setAccessible(true)`. This gives access to normally protected data which violates the principle of encapsulation. This rule detects calls to `setAccessible` and finds possible accessibility alterations. If the call to `setAccessible` is wrapped within a `PrivilegedAction`, then the access alteration is assumed to be deliberate and is not reported. Note that with Java 17 the Security Manager, which is used for `PrivilegedAction` execution, is deprecated: [JEP 411: Deprecate the Security Manager for Removal](https://openjdk.org/jeps/411). For future-proof code, deliberate access alteration should be suppressed using the usual suppression methods (e.g. by using `@SuppressWarnings` annotation).",
+      "priority": 3,
+      "xpath": "//MethodCall[\n          pmd-java:matchesSig(\"java.lang.reflect.AccessibleObject#setAccessible(boolean)\")\n       or pmd-java:matchesSig(\"_#setAccessible(java.lang.reflect.AccessibleObject[],boolean)\")\n    ]\n    [not(ArgumentList/BooleanLiteral[@True = false()])]\n    (: exclude anonymous privileged action classes :)\n    [not(ancestor::ConstructorCall[1][pmd-java:typeIs('java.security.PrivilegedAction')]/AnonymousClassDeclaration)]\n    (: exclude inner privileged action classes :)\n    [not(ancestor::ClassDeclaration[1][pmd-java:typeIs('java.security.PrivilegedAction')])]\n    (: exclude privileged action lambdas :)\n    [not(ancestor::LambdaExpression[pmd-java:typeIs('java.security.PrivilegedAction')])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[\n          pmd-java:matchesSig(\"java.lang.reflect.AccessibleObject#setAccessible(boolean)\")\n       or pmd-java:matchesSig(\"_#setAccessible(java.lang.reflect.AccessibleObject[],boolean)\")\n    ]\n    [not(ArgumentList/BooleanLiteral[@True = false()])]\n    (: exclude anonymous privileged action classes :)\n    [not(ancestor::ConstructorCall[1][pmd-java:typeIs('java.security.PrivilegedAction')]/AnonymousClassDeclaration)]\n    (: exclude inner privileged action classes :)\n    [not(ancestor::ClassDeclaration[1][pmd-java:typeIs('java.security.PrivilegedAction')])]\n    (: exclude privileged action lambdas :)\n    [not(ancestor::LambdaExpression[pmd-java:typeIs('java.security.PrivilegedAction')])]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidAccessibilityAlteration"
+    },
+    "AvoidAssertAsIdentifier": {
+      "id": "AvoidAssertAsIdentifier",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid using assert as an identifier; it became a reserved word in JDK 1.4",
+      "description": "Use of the term `assert` will conflict with newer versions of Java since it is a reserved word. Since Java 1.4, the token `assert` became a reserved word and using it as an identifier will result in a compilation failure for Java 1.4 and later. This rule is therefore only useful for old Java code before Java 1.4. It can be used to identify problematic code prior to a Java update.",
+      "priority": 2,
+      "xpath": "//VariableId[@Name='assert']",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//VariableId[@Name='assert']"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidAssertAsIdentifier"
+    },
+    "AvoidCallingFinalize": {
+      "id": "AvoidCallingFinalize",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid calling finalize() explicitly",
+      "description": "The method Object.finalize() is called by the garbage collector on an object when garbage collection determines that there are no more references to the object. It should not be invoked by application logic. Note that Oracle has declared Object.finalize() as deprecated since JDK 9.",
+      "priority": 3,
+      "xpath": "//MethodCall[pmd-java:matchesSig(\"java.lang.Object#finalize()\")]\n    (: it's ok inside finalize :)\n    [not(SuperExpression and ancestor::*[self::MethodDeclaration or self::Initializer][1][@Name = 'finalize'][@Arity = 0][VoidType])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[pmd-java:matchesSig(\"java.lang.Object#finalize()\")]\n    (: it's ok inside finalize :)\n    [not(SuperExpression and ancestor::*[self::MethodDeclaration or self::Initializer][1][@Name = 'finalize'][@Arity = 0][VoidType])]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidCallingFinalize"
+    },
+    "AvoidCatchingNPE": {
+      "id": "AvoidCatchingNPE",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid catching NullPointerException; consider removing the cause of the NPE.",
+      "description": "Code should never throw NullPointerExceptions under normal circumstances. A catch block may hide the original error, causing other, more subtle problems later on. **Deprecated:** This rule is deprecated since PMD 7.18.0 and will be removed with PMD 8.0.0. This rule has been subsumed by {% rule AvoidCatchingGenericException %}, which is now configurable as to which exceptions cause a violation.",
+      "priority": 3,
+      "xpath": "//CatchClause/CatchParameter/ClassType[pmd-java:typeIsExactly('java.lang.NullPointerException')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//CatchClause/CatchParameter/ClassType[pmd-java:typeIsExactly('java.lang.NullPointerException')]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidCatchingNPE"
+    },
+    "AvoidCatchingThrowable": {
+      "id": "AvoidCatchingThrowable",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "A catch statement should never catch throwable since it includes errors.",
+      "description": "Catching Throwable errors is not recommended since its scope is very broad. It includes runtime issues such as OutOfMemoryError that should be exposed and managed separately. **Deprecated:** This rule is deprecated since PMD 7.18.0 and will be removed with PMD 8.0.0. This rule has been subsumed by {% rule AvoidCatchingGenericException %}, which is now configurable as to which exceptions cause a violation.",
+      "priority": 3,
+      "xpath": "//CatchParameter[ClassType[pmd-java:typeIsExactly('java.lang.Throwable')]]/VariableId",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//CatchParameter[ClassType[pmd-java:typeIsExactly('java.lang.Throwable')]]/VariableId"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidCatchingThrowable"
+    },
+    "AvoidDecimalLiteralsInBigDecimalConstructor": {
+      "id": "AvoidDecimalLiteralsInBigDecimalConstructor",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid creating BigDecimal with a decimal (float/double) literal. Use a String literal",
+      "description": "One might assume that the result of \"new BigDecimal(0.1)\" is exactly equal to 0.1, but it is actually equal to .1000000000000000055511151231257827021181583404541015625. This is because 0.1 cannot be represented exactly as a double (or as a binary fraction of any finite length). Thus, the long value that is being passed in to the constructor is not exactly equal to 0.1, appearances notwithstanding. The (String) constructor, on the other hand, is perfectly predictable: 'new BigDecimal(\"0.1\")' is exactly equal to 0.1, as one would expect. Therefore, it is generally recommended that the (String) constructor be used in preference to this one.",
+      "priority": 3,
+      "xpath": "//ConstructorCall[pmd-java:matchesSig('java.math.BigDecimal#new(double)')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ConstructorCall[pmd-java:matchesSig('java.math.BigDecimal#new(double)')]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidDecimalLiteralsInBigDecimalConstructor"
+    },
+    "AvoidEnumAsIdentifier": {
+      "id": "AvoidEnumAsIdentifier",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid using enum as an identifier; it's a reserved word in JDK 1.5",
+      "description": "Use of the term `enum` will conflict with newer versions of Java since it is a reserved word. Since Java 1.5, the token `enum` became a reserved word and using it as an identifier will result in a compilation failure for Java 1.5 and later. This rule is therefore only useful for old Java code before Java 1.5. It can be used to identify problematic code prior to a Java update.",
+      "priority": 2,
+      "xpath": "//VariableId[@Name='enum']",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//VariableId[@Name='enum']"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidEnumAsIdentifier"
+    },
+    "AvoidFieldNameMatchingMethodName": {
+      "id": "AvoidFieldNameMatchingMethodName",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Field {0} has the same name as a method",
+      "description": "It can be confusing to have a field name with the same name as a method. While this is permitted, having information (field) and actions (method) is not clear naming. Developers versed in Smalltalk often prefer this approach as the methods denote accessor methods.",
+      "priority": 3,
+      "xpath": "//FieldDeclaration/VariableDeclarator/VariableId\n    [some $method in ../../..[self::ClassBody or self::EnumBody]/MethodDeclaration\n     satisfies lower-case(@Name) = lower-case($method/@Name)]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FieldDeclaration/VariableDeclarator/VariableId\n    [some $method in ../../..[self::ClassBody or self::EnumBody]/MethodDeclaration\n     satisfies lower-case(@Name) = lower-case($method/@Name)]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidFieldNameMatchingMethodName"
+    },
+    "AvoidFieldNameMatchingTypeName": {
+      "id": "AvoidFieldNameMatchingTypeName",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "It is somewhat confusing to have a field name matching the declaring class name",
+      "description": "It is somewhat confusing to have a field name matching the declaring type name. This probably means that type and/or field names should be chosen more carefully.",
+      "priority": 3,
+      "xpath": "//FieldDeclaration/VariableDeclarator/VariableId\n    [lower-case(@Name) = lower-case(ancestor::ClassDeclaration[1]/@SimpleName)]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FieldDeclaration/VariableDeclarator/VariableId\n    [lower-case(@Name) = lower-case(ancestor::ClassDeclaration[1]/@SimpleName)]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidFieldNameMatchingTypeName"
+    },
+    "AvoidInstanceofChecksInCatchClause": {
+      "id": "AvoidInstanceofChecksInCatchClause",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "An instanceof check is being performed on the caught exception. Create a separate catch clause for {0}.",
+      "description": "Each caught exception type should be handled in its own catch clause.",
+      "priority": 3,
+      "xpath": "//CatchParameter\n    /following-sibling::Block//InfixExpression[@Operator = 'instanceof']\n        /VariableAccess[@Name = ./ancestor::Block/preceding-sibling::CatchParameter/@Name]\n            /following-sibling::TypeExpression/*",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//CatchParameter\n    /following-sibling::Block//InfixExpression[@Operator = 'instanceof']\n        /VariableAccess[@Name = ./ancestor::Block/preceding-sibling::CatchParameter/@Name]\n            /following-sibling::TypeExpression/*"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidInstanceofChecksInCatchClause"
+    },
+    "AvoidLosingExceptionInformation": {
+      "id": "AvoidLosingExceptionInformation",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid statements in a catch block that invoke accessors on the exception without using the information",
+      "description": "Statements in a catch block that invoke accessors on the exception without using the information only add to code size. Either remove the invocation, or use the return result. **Deprecated:** This rule is deprecated since PMD 7.17.0 and will be removed with PMD 8.0.0. This rule has been replaced by {% rule UselessPureMethodCall %}.",
+      "priority": 2,
+      "xpath": "//CatchClause/Block//ExpressionStatement/MethodCall[\n    pmd-java:matchesSig(\"java.lang.Throwable#getMessage()\")\n    or pmd-java:matchesSig(\"java.lang.Throwable#getLocalizedMessage()\")\n    or pmd-java:matchesSig(\"java.lang.Throwable#getCause()\")\n    or pmd-java:matchesSig(\"java.lang.Throwable#getStackTrace()\")\n    or pmd-java:matchesSig(\"java.lang.Object#toString()\")\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//CatchClause/Block//ExpressionStatement/MethodCall[\n    pmd-java:matchesSig(\"java.lang.Throwable#getMessage()\")\n    or pmd-java:matchesSig(\"java.lang.Throwable#getLocalizedMessage()\")\n    or pmd-java:matchesSig(\"java.lang.Throwable#getCause()\")\n    or pmd-java:matchesSig(\"java.lang.Throwable#getStackTrace()\")\n    or pmd-java:matchesSig(\"java.lang.Object#toString()\")\n]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidLosingExceptionInformation"
+    },
+    "AvoidMultipleUnaryOperators": {
+      "id": "AvoidMultipleUnaryOperators",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Using multiple unary operators may be a bug, and/or is confusing.",
+      "description": "The use of multiple unary operators may be problematic, and/or confusing. Ensure that the intended usage is not a bug, or consider simplifying the expression.",
+      "priority": 2,
+      "xpath": "(: Only report on the toplevel one :)\n                    //UnaryExpression[UnaryExpression and not(parent::UnaryExpression)]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "(: Only report on the toplevel one :)\n                    //UnaryExpression[UnaryExpression and not(parent::UnaryExpression)]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/AvoidMultipleUnaryOperators"
+    },
+    "CallSuperFirst": {
+      "id": "CallSuperFirst",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "super should be called at the start of the method",
+      "description": "Super should be called at the start of the method",
+      "priority": 3,
+      "xpath": "//ClassDeclaration\n    [\n      pmd-java:typeIs('android.app.Activity') or\n      pmd-java:typeIs('android.app.Application') or\n      pmd-java:typeIs('android.app.Service')\n    ]\n    //MethodDeclaration\n    [\n      @Name=('onCreate', 'onConfigurationChanged', 'onPostCreate', 'onPostResume', 'onRestart',\n             'onRestoreInstanceState', 'onResume', 'onStart')\n    ]\n    [not(Block/*[1]/MethodCall[SuperExpression][@MethodName = ancestor::MethodDeclaration/@Name])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n    [\n      pmd-java:typeIs('android.app.Activity') or\n      pmd-java:typeIs('android.app.Application') or\n      pmd-java:typeIs('android.app.Service')\n    ]\n    //MethodDeclaration\n    [\n      @Name=('onCreate', 'onConfigurationChanged', 'onPostCreate', 'onPostResume', 'onRestart',\n             'onRestoreInstanceState', 'onResume', 'onStart')\n    ]\n    [not(Block/*[1]/MethodCall[SuperExpression][@MethodName = ancestor::MethodDeclaration/@Name])]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/CallSuperFirst"
+    },
+    "CallSuperLast": {
+      "id": "CallSuperLast",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "super should be called at the end of the method",
+      "description": "Super should be called at the end of the method",
+      "priority": 3,
+      "xpath": "//ClassDeclaration\n    [\n      pmd-java:typeIs('android.app.Activity') or\n      pmd-java:typeIs('android.app.Application') or\n      pmd-java:typeIs('android.app.Service')\n    ]\n    //MethodDeclaration\n    [\n      @Name=('finish', 'onDestroy', 'onPause', 'onSaveInstanceState', 'onStop', 'onTerminate')\n    ]\n    [not(Block/*[last()]/MethodCall[SuperExpression][@MethodName = ancestor::MethodDeclaration/@Name])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n    [\n      pmd-java:typeIs('android.app.Activity') or\n      pmd-java:typeIs('android.app.Application') or\n      pmd-java:typeIs('android.app.Service')\n    ]\n    //MethodDeclaration\n    [\n      @Name=('finish', 'onDestroy', 'onPause', 'onSaveInstanceState', 'onStop', 'onTerminate')\n    ]\n    [not(Block/*[last()]/MethodCall[SuperExpression][@MethodName = ancestor::MethodDeclaration/@Name])]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/CallSuperLast"
+    },
+    "ClassCastExceptionWithToArray": {
+      "id": "ClassCastExceptionWithToArray",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "This usage of the Collection.toArray() method will throw a ClassCastException.",
+      "description": "When deriving an array of a specific class from your Collection, one should provide an array of the same class as the parameter of the `toArray()` method. Doing otherwise will result in a `ClassCastException`.",
+      "priority": 3,
+      "xpath": "//CastExpression[ArrayType/ClassType[not(pmd-java:typeIsExactly('java.lang.Object'))]]\n    /MethodCall[pmd-java:matchesSig(\"java.util.Collection#toArray()\")]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//CastExpression[ArrayType/ClassType[not(pmd-java:typeIsExactly('java.lang.Object'))]]\n    /MethodCall[pmd-java:matchesSig(\"java.util.Collection#toArray()\")]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/ClassCastExceptionWithToArray"
+    },
+    "CloneMethodMustBePublic": {
+      "id": "CloneMethodMustBePublic",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "clone() method must be public if the class implements Cloneable",
+      "description": "The java manual says \"By convention, classes that implement this interface should override Object.clone (which is protected) with a public method.\"",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[not(pmd-java:modifiers() = \"public\")]\n    [@Name = 'clone']\n    [@Arity = 0]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[not(pmd-java:modifiers() = \"public\")]\n    [@Name = 'clone']\n    [@Arity = 0]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/CloneMethodMustBePublic"
+    },
+    "CloneMethodReturnTypeMustMatchClassName": {
+      "id": "CloneMethodReturnTypeMustMatchClassName",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "The return type of the clone() method must be the class name when implements Cloneable",
+      "description": "If a class implements `Cloneable` the return type of the method `clone()` must be the class name. That way, the caller of the clone method doesn't need to cast the returned clone to the correct type. Note: Such a covariant return type is only possible with Java 1.5 or higher.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration\n    [@Name = 'clone']\n    [@Arity = 0]\n    [ClassType[1]/@SimpleName != ancestor::ClassDeclaration[1]/@SimpleName]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration\n    [@Name = 'clone']\n    [@Arity = 0]\n    [ClassType[1]/@SimpleName != ancestor::ClassDeclaration[1]/@SimpleName]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/CloneMethodReturnTypeMustMatchClassName"
+    },
+    "ComparisonWithNaN": {
+      "id": "ComparisonWithNaN",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Comparisons with NaN always return false",
+      "description": "Reports comparisons with double and float `NaN` (Not-a-Number) values. These are [specified](https://docs.oracle.com/javase/specs/jls/se8/html/jls-15.html#jls-15.21.1) to have unintuitive behavior: NaN is considered unequal to itself. This means a check like `someDouble == Double.NaN` will always return false, even if `someDouble` is really the NaN value. To test whether a value is the NaN value, one should instead use `Double.isNaN(someDouble)` (or `Float.isNaN`). The `!=` operator should be treated similarly. Finally, comparisons like `someDouble <= Double.NaN` are nonsensical and will always evaluate to false. This rule has been renamed from \"BadComparison\" in PMD 6.36.0.",
+      "priority": 3,
+      "xpath": "//InfixExpression[@Operator = (\"==\", \"!=\", \"<=\", \">=\", \"<\", \">\")]/FieldAccess[@Name='NaN' and (pmd-java:typeIs('double') or pmd-java:typeIs('float'))]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//InfixExpression[@Operator = (\"==\", \"!=\", \"<=\", \">=\", \"<\", \">\")]/FieldAccess[@Name='NaN' and (pmd-java:typeIs('double') or pmd-java:typeIs('float'))]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/ComparisonWithNaN"
+    },
+    "DoNotCallGarbageCollectionExplicitly": {
+      "id": "DoNotCallGarbageCollectionExplicitly",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Do not explicitly trigger a garbage collection.",
+      "description": "Calls to `System.gc()`, `Runtime.getRuntime().gc()`, and `System.runFinalization()` are not advised. Code should have the same behavior whether the garbage collection is disabled using the option `-Xdisableexplicitgc` or not. Moreover, \"modern\" JVMs do a very good job handling garbage collections. If memory usage issues unrelated to memory leaks develop within an application, it should be dealt with JVM options rather than within the code itself.",
+      "priority": 2,
+      "xpath": "//MethodCall[\n       pmd-java:matchesSig(\"java.lang.System#gc()\")\n    or pmd-java:matchesSig(\"java.lang.Runtime#gc()\")\n    or pmd-java:matchesSig(\"java.lang.System#runFinalization()\")\n    or pmd-java:matchesSig(\"java.lang.Runtime#runFinalization()\")\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[\n       pmd-java:matchesSig(\"java.lang.System#gc()\")\n    or pmd-java:matchesSig(\"java.lang.Runtime#gc()\")\n    or pmd-java:matchesSig(\"java.lang.System#runFinalization()\")\n    or pmd-java:matchesSig(\"java.lang.Runtime#runFinalization()\")\n]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/DoNotCallGarbageCollectionExplicitly"
+    },
+    "DoNotExtendJavaLangThrowable": {
+      "id": "DoNotExtendJavaLangThrowable",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Exceptions should not extend java.lang.Throwable",
+      "description": "Extend Exception or RuntimeException instead of Throwable.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration/ExtendsList/ClassType\n  [pmd-java:typeIsExactly('java.lang.Throwable')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration/ExtendsList/ClassType\n  [pmd-java:typeIsExactly('java.lang.Throwable')]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/DoNotExtendJavaLangThrowable"
+    },
+    "DoNotHardCodeSDCard": {
+      "id": "DoNotHardCodeSDCard",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Do not hardcode /sdcard.",
+      "description": "Use Environment.getExternalStorageDirectory() instead of \"/sdcard\"",
+      "priority": 3,
+      "xpath": "//StringLiteral[starts-with(@Image,'\"/sdcard')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//StringLiteral[starts-with(@Image,'\"/sdcard')]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/DoNotHardCodeSDCard"
+    },
+    "DoNotTerminateVM": {
+      "id": "DoNotTerminateVM",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "System.exit() should not be used in J2EE/JEE apps",
+      "description": "Web applications should not call `System.exit()`, since only the web container or the application server should stop the JVM. Otherwise a web application would terminate all other applications running on the same application server. This rule also checks for the equivalent calls `Runtime.getRuntime().exit()` and `Runtime.getRuntime().halt()`. This rule has been renamed from \"DoNotCallSystemExit\" in PMD 6.29.0.",
+      "priority": 3,
+      "xpath": "//(MethodDeclaration[@MainMethod = false()] | Initializer)//MethodCall[\n    pmd-java:matchesSig(\"java.lang.System#exit(int)\")\n    or pmd-java:matchesSig(\"java.lang.Runtime#exit(int)\")\n    or pmd-java:matchesSig(\"java.lang.Runtime#halt(int)\")\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//(MethodDeclaration[@MainMethod = false()] | Initializer)//MethodCall[\n    pmd-java:matchesSig(\"java.lang.System#exit(int)\")\n    or pmd-java:matchesSig(\"java.lang.Runtime#exit(int)\")\n    or pmd-java:matchesSig(\"java.lang.Runtime#halt(int)\")\n]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/DoNotTerminateVM"
+    },
+    "DoNotThrowExceptionInFinally": {
+      "id": "DoNotThrowExceptionInFinally",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "A throw statement in a finally block makes the control flow hard to understand.",
+      "description": "Throwing exceptions within a 'finally' block is confusing since they may mask other exceptions or code defects. Note: This is a PMD implementation of the Lint4j rule \"A throw in a finally block\"",
+      "priority": 4,
+      "xpath": "//FinallyClause[descendant::ThrowStatement]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FinallyClause[descendant::ThrowStatement]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/DoNotThrowExceptionInFinally"
+    },
+    "DontImportSun": {
+      "id": "DontImportSun",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid importing anything from the 'sun.*' packages",
+      "description": "Avoid importing anything from the 'sun.*' packages. These packages are not portable and are likely to change. If you find yourself having to depend on Sun APIs, confine this dependency to as small a scope as possible, for instance by writing a stable wrapper class around the unstable API. You can then suppress this rule in the implementation of the wrapper.",
+      "priority": 4,
+      "xpath": "//ImportDeclaration[starts-with(@ImportedName, 'sun.')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ImportDeclaration[starts-with(@ImportedName, 'sun.')]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/DontImportSun"
+    },
+    "DontUseFloatTypeForLoopIndices": {
+      "id": "DontUseFloatTypeForLoopIndices",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Don't use floating point for loop indices. If you must use floating point, use double.",
+      "description": "Don't use floating point for loop indices. If you must use floating point, use double unless you're certain that float provides enough precision and you have a compelling performance need (space or time).",
+      "priority": 3,
+      "xpath": "//ForStatement[\n    ForInit//VariableId[pmd-java:typeIs('float')]\n    or ForUpdate//VariableAccess[pmd-java:typeIs('float')]\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ForStatement[\n    ForInit//VariableId[pmd-java:typeIs('float')]\n    or ForUpdate//VariableAccess[pmd-java:typeIs('float')]\n]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/DontUseFloatTypeForLoopIndices"
+    },
+    "EmptyFinalizer": {
+      "id": "EmptyFinalizer",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid empty finalize methods",
+      "description": "Empty finalize methods serve no purpose and should be removed. Note that Oracle has declared Object.finalize() as deprecated since JDK 9.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration\n  /ClassBody\n    /MethodDeclaration[@Name = \"finalize\"][@Arity = 0][@Final = false() or ancestor::ClassDeclaration[@Final = true()]]\n      /Block[not(*)]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n  /ClassBody\n    /MethodDeclaration[@Name = \"finalize\"][@Arity = 0][@Final = false() or ancestor::ClassDeclaration[@Final = true()]]\n      /Block[not(*)]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/EmptyFinalizer"
+    },
+    "EqualsNull": {
+      "id": "EqualsNull",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid using equals() to compare against null",
+      "description": "Tests for null should not use the equals() method. The '==' operator should be used instead.",
+      "priority": 1,
+      "xpath": "//MethodCall[@MethodName = \"equals\" and ArgumentList[count(*) = 1 and NullLiteral]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[@MethodName = \"equals\" and ArgumentList[count(*) = 1 and NullLiteral]]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/EqualsNull"
+    },
+    "FinalizeDoesNotCallSuperFinalize": {
+      "id": "FinalizeDoesNotCallSuperFinalize",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Last statement in finalize method should be a call to super.finalize()",
+      "description": "If the finalize() is implemented, its last action should be to call super.finalize. Note that Oracle has declared Object.finalize() as deprecated since JDK 9.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[@Name = \"finalize\"][@Arity = 0]\n   /Block/*[last()]\n      [not(MethodCall[@MethodName = \"finalize\"]/SuperExpression)]\n      [not(FinallyClause/Block/ExpressionStatement/\n          MethodCall[@MethodName = \"finalize\"]/SuperExpression)]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Name = \"finalize\"][@Arity = 0]\n   /Block/*[last()]\n      [not(MethodCall[@MethodName = \"finalize\"]/SuperExpression)]\n      [not(FinallyClause/Block/ExpressionStatement/\n          MethodCall[@MethodName = \"finalize\"]/SuperExpression)]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/FinalizeDoesNotCallSuperFinalize"
+    },
+    "FinalizeOnlyCallsSuperFinalize": {
+      "id": "FinalizeOnlyCallsSuperFinalize",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Finalize should do something besides just calling super.finalize()",
+      "description": "If the finalize() is implemented, it should do something besides just calling super.finalize(). Note that Oracle has declared Object.finalize() as deprecated since JDK 9.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[@Name='finalize'][@Arity = 0]\n   [Block[@Size=1]/ExpressionStatement/MethodCall[@MethodName = \"finalize\"][SuperExpression]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Name='finalize'][@Arity = 0]\n   [Block[@Size=1]/ExpressionStatement/MethodCall[@MethodName = \"finalize\"][SuperExpression]]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/FinalizeOnlyCallsSuperFinalize"
+    },
+    "FinalizeOverloaded": {
+      "id": "FinalizeOverloaded",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Finalize methods should not be overloaded",
+      "description": "Methods named finalize() should not have parameters. It is confusing and most likely an attempt to overload Object.finalize(). It will not be called by the VM. Note that Oracle has declared Object.finalize() as deprecated since JDK 9.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[@Name='finalize'][@Arity > 0]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Name='finalize'][@Arity > 0]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/FinalizeOverloaded"
+    },
+    "FinalizeShouldBeProtected": {
+      "id": "FinalizeShouldBeProtected",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "If you override finalize(), make it protected",
+      "description": "When overriding the finalize(), the new method should be set as protected. If made public, other classes may invoke it at inappropriate times. Note that Oracle has declared Object.finalize() as deprecated since JDK 9.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[@Visibility != \"protected\"][@Name='finalize'][@Arity = 0]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Visibility != \"protected\"][@Name='finalize'][@Arity = 0]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/FinalizeShouldBeProtected"
+    },
+    "InstantiationToGetClass": {
+      "id": "InstantiationToGetClass",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid instantiating an object just to call getClass() on it; use the .class public member instead",
+      "description": "Avoid instantiating an object just to call getClass() on it; use the .class public member instead.",
+      "priority": 4,
+      "xpath": "//MethodCall\n [@MethodName='getClass']\n [ConstructorCall]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall\n [@MethodName='getClass']\n [ConstructorCall]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/InstantiationToGetClass"
+    },
+    "JumbledIncrementer": {
+      "id": "JumbledIncrementer",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid modifying an outer loop incrementer in an inner loop for update expression",
+      "description": "Avoid jumbled loop incrementers - it's usually a mistake, and is confusing even if intentional.",
+      "priority": 3,
+      "xpath": "//ForStatement\n    [not(ForInit) or ForInit//VariableId/@Name != ForUpdate//VariableAccess/@Name]\n    [ForUpdate//VariableAccess[@AccessType = 'WRITE']/@Name\n     =\n     ancestor::ForStatement/ForInit//VariableId/@Name\n    ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ForStatement\n    [not(ForInit) or ForInit//VariableId/@Name != ForUpdate//VariableAccess/@Name]\n    [ForUpdate//VariableAccess[@AccessType = 'WRITE']/@Name\n     =\n     ancestor::ForStatement/ForInit//VariableId/@Name\n    ]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/JumbledIncrementer"
+    },
+    "MethodWithSameNameAsEnclosingClass": {
+      "id": "MethodWithSameNameAsEnclosingClass",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "A method should not have the same name as its containing class",
+      "description": "A method should not have the same name as its containing class. This would be confusing as it would look like a constructor.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[@Name = ancestor::ClassDeclaration/@SimpleName]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Name = ancestor::ClassDeclaration/@SimpleName]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/MethodWithSameNameAsEnclosingClass"
+    },
+    "MisplacedNullCheck": {
+      "id": "MisplacedNullCheck",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "The null check here is misplaced; if the variable ''{0}'' is null there will be a NullPointerException",
+      "description": "The null check here is misplaced. If the variable is null a `NullPointerException` will be thrown. Either the check is useless (the variable will never be `null`) or it is incorrect.",
+      "priority": 3,
+      "xpath": "//InfixExpression[@Operator = '&&']\n    /InfixExpression[@Operator = '!=']\n        (: one side is null :)\n        [NullLiteral]\n        (: other side checks for the variable used somewhere in the first child of conditional and expression :)\n        [VariableAccess]\n        [some $var in preceding-sibling::*//VariableAccess\n            [parent::MethodCall or parent::FieldAccess]\n            [not(ancestor::InfixExpression[@Operator = '||'])]\n            /@Name\n            satisfies $var = VariableAccess/@Name\n        ]\n    /VariableAccess\n|\n//InfixExpression[@Operator = '||']\n    /InfixExpression[@Operator = '==']\n        (: one side is null :)\n        [NullLiteral]\n        (: other side checks for the variable used somewhere in the first child of conditional or expression :)\n        [VariableAccess]\n        [some $var in preceding-sibling::*//VariableAccess\n            [parent::MethodCall or parent::FieldAccess]\n            [not(ancestor::InfixExpression[@Operator = '&&'])]\n            /@Name\n            satisfies $var = VariableAccess/@Name\n        ]\n    /VariableAccess",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//InfixExpression[@Operator = '&&']\n    /InfixExpression[@Operator = '!=']\n        (: one side is null :)\n        [NullLiteral]\n        (: other side checks for the variable used somewhere in the first child of conditional and expression :)\n        [VariableAccess]\n        [some $var in preceding-sibling::*//VariableAccess\n            [parent::MethodCall or parent::FieldAccess]\n            [not(ancestor::InfixExpression[@Operator = '||'])]\n            /@Name\n            satisfies $var = VariableAccess/@Name\n        ]\n    /VariableAccess\n|\n//InfixExpression[@Operator = '||']\n    /InfixExpression[@Operator = '==']\n        (: one side is null :)\n        [NullLiteral]\n        (: other side checks for the variable used somewhere in the first child of conditional or expression :)\n        [VariableAccess]\n        [some $var in preceding-sibling::*//VariableAccess\n            [parent::MethodCall or parent::FieldAccess]\n            [not(ancestor::InfixExpression[@Operator = '&&'])]\n            /@Name\n            satisfies $var = VariableAccess/@Name\n        ]\n    /VariableAccess"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/MisplacedNullCheck"
+    },
+    "MissingSerialVersionUID": {
+      "id": "MissingSerialVersionUID",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Classes implementing Serializable should set a serialVersionUID",
+      "description": "Serializable classes should provide a serialVersionUID field. The serialVersionUID field is also needed for abstract base classes. Each individual class in the inheritance chain needs an own serialVersionUID field. See also [Should an abstract class have a serialVersionUID](https://stackoverflow.com/questions/893259/should-an-abstract-class-have-a-serialversionuid).",
+      "priority": 3,
+      "xpath": "//ClassDeclaration\n    [@Interface = false()]\n    [count(ClassBody/FieldDeclaration/VariableDeclarator/VariableId[@Name='serialVersionUID']) = 0]\n    [(ImplementsList | ExtendsList)/ClassType[pmd-java:typeIs('java.io.Serializable')]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n    [@Interface = false()]\n    [count(ClassBody/FieldDeclaration/VariableDeclarator/VariableId[@Name='serialVersionUID']) = 0]\n    [(ImplementsList | ExtendsList)/ClassType[pmd-java:typeIs('java.io.Serializable')]]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/MissingSerialVersionUID"
+    },
+    "MoreThanOneLogger": {
+      "id": "MoreThanOneLogger",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Class contains more than one logger.",
+      "description": "Normally only one logger is used in each class. This rule supports slf4j, log4j, Java Util Logging and log4j2 (since 6.19.0).",
+      "priority": 2,
+      "xpath": "//ClassDeclaration[\n  count(\n    ClassBody/FieldDeclaration/ClassType[\n      pmd-java:typeIs(\"org.apache.log4j.Logger\") or\n      pmd-java:typeIs(\"org.apache.logging.log4j.Logger\") or\n      pmd-java:typeIs(\"java.util.logging.Logger\") or\n      pmd-java:typeIs(\"org.slf4j.Logger\")\n    ]\n  ) > 1\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration[\n  count(\n    ClassBody/FieldDeclaration/ClassType[\n      pmd-java:typeIs(\"org.apache.log4j.Logger\") or\n      pmd-java:typeIs(\"org.apache.logging.log4j.Logger\") or\n      pmd-java:typeIs(\"java.util.logging.Logger\") or\n      pmd-java:typeIs(\"org.slf4j.Logger\")\n    ]\n  ) > 1\n]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/MoreThanOneLogger"
+    },
+    "NonCaseLabelInSwitch": {
+      "id": "NonCaseLabelInSwitch",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "A non-case label was present in a switch statement or expression",
+      "description": "A non-case label (e.g. a named break/continue label) was present in a switch statement or switch expression. This is legal, but confusing. It is easy to mix up the case labels and the non-case labels. Note: This rule was renamed from `NonCaseLabelInSwitchStatement` with PMD 7.7.0.",
+      "priority": 3,
+      "xpath": "//(SwitchStatement|SwitchExpression)//LabeledStatement",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//(SwitchStatement|SwitchExpression)//LabeledStatement"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/NonCaseLabelInSwitch"
+    },
+    "NonStaticInitializer": {
+      "id": "NonStaticInitializer",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Non-static initializers are confusing",
+      "description": "A non-static initializer block will be called any time a constructor is invoked (just prior to invoking the constructor). While this is a valid language construct, it is rarely used and is confusing.",
+      "priority": 3,
+      "xpath": "//Initializer[@Static=false()][not(ancestor::*[3][self::ConstructorCall or self::EnumConstant])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//Initializer[@Static=false()][not(ancestor::*[3][self::ConstructorCall or self::EnumConstant])]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/NonStaticInitializer"
+    },
+    "ReplaceJavaUtilCalendar": {
+      "id": "ReplaceJavaUtilCalendar",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Usage of java.util.Calendar should be replaced with classes from java.time",
+      "description": "The legacy `java.util.Calendar` API is error-prone, mutable, and not thread-safe. It has confusing month indexing (January = 0), inconsistent field semantics, and verbose usage patterns. The modern `java.time API` (introduced in Java 8) provides immutable, thread-safe alternatives with clear, intuitive methods. Use `LocalDate` (for date-only operations), `LocalDateTime` (for date and time), or `ZonedDateTime` (when timezone is important) from `java.time` package instead. Note: Since JPA 3.2 (Jakarta Persistence) usage of `java.util.Date` and `java.util.Calendar` and others is deprecated there as well in favour of `java.time` API.",
+      "priority": 3,
+      "xpath": "//LocalVariableDeclaration[ClassType[pmd-java:typeIs('java.util.Calendar')]] |\n                //FormalParameter[ClassType[pmd-java:typeIs('java.util.Calendar')]] |\n                //FieldDeclaration[ClassType[pmd-java:typeIs('java.util.Calendar')]] |\n                //ConstructorCall[ClassType[pmd-java:typeIs('java.util.Calendar')]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//LocalVariableDeclaration[ClassType[pmd-java:typeIs('java.util.Calendar')]] |\n                //FormalParameter[ClassType[pmd-java:typeIs('java.util.Calendar')]] |\n                //FieldDeclaration[ClassType[pmd-java:typeIs('java.util.Calendar')]] |\n                //ConstructorCall[ClassType[pmd-java:typeIs('java.util.Calendar')]]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/ReplaceJavaUtilCalendar"
+    },
+    "ReplaceJavaUtilDate": {
+      "id": "ReplaceJavaUtilDate",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Usage of java.util.Date should be replaced with classes from java.time",
+      "description": "The legacy `java.util.Date` class is mutable, not thread-safe, and has a confusing API. Many of its methods are deprecated, it doesn't handle timezones properly, and it represents both date and time even when only one is needed. The constructor parameters are particularly error-prone: year is \"years since 1900\" and month is 0-based (January = 0). The modern java.time API (introduced in Java 8) provides better type safety, immutability, and clearer semantics. Use `LocalDate` (date only), `LocalTime` (time only), `LocalDateTime` (date and time), `Instant` (timestamp), or `ZonedDateTime` (date-time with timezone) from `java.time` package instead. Note: This includes subtypes such as `java.sql.Date`, `java.sql.Time` and `java.sql.Timestamp`. Since JPA 3.2 (Jakarta Persistence) usage of `java.util.Date` and `java.util.Calendar` and others is deprecated there as well in favour of `java.time` API.",
+      "priority": 3,
+      "xpath": "//LocalVariableDeclaration[ClassType[pmd-java:typeIs('java.util.Date')]] |\n                //FormalParameter[ClassType[pmd-java:typeIs('java.util.Date')]] |\n                //FieldDeclaration[ClassType[pmd-java:typeIs('java.util.Date')]] |\n                //ConstructorCall[ClassType[pmd-java:typeIs('java.util.Date')]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//LocalVariableDeclaration[ClassType[pmd-java:typeIs('java.util.Date')]] |\n                //FormalParameter[ClassType[pmd-java:typeIs('java.util.Date')]] |\n                //FieldDeclaration[ClassType[pmd-java:typeIs('java.util.Date')]] |\n                //ConstructorCall[ClassType[pmd-java:typeIs('java.util.Date')]]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/ReplaceJavaUtilDate"
+    },
+    "ReturnEmptyCollectionRatherThanNull": {
+      "id": "ReturnEmptyCollectionRatherThanNull",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Return an empty collection rather than 'null'.",
+      "description": "For any method that returns an collection (such as an array, Collection or Map), it is better to return an empty one rather than a null reference. This removes the need for null checking all results and avoids inadvertent NullPointerExceptions. See Effective Java, 3rd Edition, Item 54: Return empty collections or arrays instead of null",
+      "priority": 1,
+      "xpath": "//ReturnStatement/NullLiteral\n[ancestor::MethodDeclaration[1]\n    [ArrayType\n     or ClassType[pmd-java:typeIs('java.util.Collection')\n        or pmd-java:typeIs('java.util.Map')]]\n]\n[not(./ancestor::LambdaExpression)]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ReturnStatement/NullLiteral\n[ancestor::MethodDeclaration[1]\n    [ArrayType\n     or ClassType[pmd-java:typeIs('java.util.Collection')\n        or pmd-java:typeIs('java.util.Map')]]\n]\n[not(./ancestor::LambdaExpression)]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/ReturnEmptyCollectionRatherThanNull"
+    },
+    "ReturnFromFinallyBlock": {
+      "id": "ReturnFromFinallyBlock",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid returning from a finally block",
+      "description": "Avoid returning from a finally block, this can discard exceptions.",
+      "priority": 3,
+      "xpath": "//FinallyClause//ReturnStatement except //FinallyClause//(MethodDeclaration|LambdaExpression)//ReturnStatement",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FinallyClause//ReturnStatement except //FinallyClause//(MethodDeclaration|LambdaExpression)//ReturnStatement"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/ReturnFromFinallyBlock"
+    },
+    "SimpleDateFormatNeedsLocale": {
+      "id": "SimpleDateFormatNeedsLocale",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "When instantiating a SimpleDateFormat object, specify a Locale",
+      "description": "Be sure to specify a Locale when creating SimpleDateFormat instances to ensure that locale-appropriate formatting is used.",
+      "priority": 3,
+      "xpath": "//ConstructorCall\n    [pmd-java:typeIs('java.text.SimpleDateFormat')]\n    [ArgumentList/@Size = 1]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ConstructorCall\n    [pmd-java:typeIs('java.text.SimpleDateFormat')]\n    [ArgumentList/@Size = 1]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/SimpleDateFormatNeedsLocale"
+    },
+    "StaticEJBFieldShouldBeFinal": {
+      "id": "StaticEJBFieldShouldBeFinal",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "EJB's shouldn't have non-final static fields",
+      "description": "According to the J2EE specification, an EJB should not have any static fields with write access. However, static read-only fields are allowed. This ensures proper behavior especially when instances are distributed by the container on several JREs.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration[ImplementsList/ClassType[\n        pmd-java:typeIs('javax.ejb.SessionBean')\n     or pmd-java:typeIs('javax.ejb.EJBHome')\n     or pmd-java:typeIs('javax.ejb.EJBLocalObject')\n     or pmd-java:typeIs('javax.ejb.EJBLocalHome')\n     or pmd-java:typeIs('javax.ejb.EJBObject')\n    ]]\n    /ClassBody/FieldDeclaration\n        [pmd-java:modifiers() = 'static']\n        [not(pmd-java:modifiers() = 'final')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration[ImplementsList/ClassType[\n        pmd-java:typeIs('javax.ejb.SessionBean')\n     or pmd-java:typeIs('javax.ejb.EJBHome')\n     or pmd-java:typeIs('javax.ejb.EJBLocalObject')\n     or pmd-java:typeIs('javax.ejb.EJBLocalHome')\n     or pmd-java:typeIs('javax.ejb.EJBObject')\n    ]]\n    /ClassBody/FieldDeclaration\n        [pmd-java:modifiers() = 'static']\n        [not(pmd-java:modifiers() = 'final')]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/StaticEJBFieldShouldBeFinal"
+    },
+    "StringBufferInstantiationWithChar": {
+      "id": "StringBufferInstantiationWithChar",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Argument to `new StringBuilder()` or `new StringBuffer()` is implicitly converted from char to int",
+      "description": "Individual character values provided as initialization arguments will be converted into integers. This can lead to internal buffer sizes that are larger than expected. Some examples: ``` new StringBuffer() // 16 new StringBuffer(6) // 6 new StringBuffer(\"hello world\") // 11 + 16 = 27 new StringBuffer('A') // chr(A) = 65 new StringBuffer(\"A\") // 1 + 16 = 17 new StringBuilder() // 16 new StringBuilder(6) // 6 new StringBuilder(\"hello world\") // 11 + 16 = 27 new StringBuilder('C') // chr(C) = 67 new StringBuilder(\"A\") // 1 + 16 = 17 ```",
+      "priority": 4,
+      "xpath": "//ConstructorCall[ArgumentList/*[pmd-java:typeIsExactly('char')]]\n    [pmd-java:matchesSig('java.lang.StringBuilder#new(int)')\n     or pmd-java:matchesSig('java.lang.StringBuffer#new(int)')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ConstructorCall[ArgumentList/*[pmd-java:typeIsExactly('char')]]\n    [pmd-java:matchesSig('java.lang.StringBuilder#new(int)')\n     or pmd-java:matchesSig('java.lang.StringBuffer#new(int)')]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/StringBufferInstantiationWithChar"
+    },
+    "SuspiciousEqualsMethodName": {
+      "id": "SuspiciousEqualsMethodName",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "The method name and parameter number are suspiciously close to equals(Object)",
+      "description": "The method name and parameter number are suspiciously close to `Object.equals`, which can denote an intention to override it. However, the method does not override `Object.equals`, but overloads it instead. Overloading `Object.equals` method is confusing for other programmers, error-prone and hard to maintain, especially when using inheritance, because `@Override` annotations used in subclasses can provide a false sense of security. For more information on `Object.equals` method, see Effective Java, 3rd Edition, Item 10: Obey the general contract when overriding equals.",
+      "priority": 2,
+      "xpath": "//MethodDeclaration[@Name = 'equals'][\n    (@Arity = 1\n     and not(FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')])\n     or not(PrimitiveType[@Kind = 'boolean'])\n    ) or (\n     @Arity = 2\n     and PrimitiveType[@Kind = 'boolean']\n     and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]\n     and not(pmd-java:hasAnnotation('java.lang.Override'))\n    )\n]\n| //MethodDeclaration[@Name = 'equal'][\n    @Arity = 1\n    and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[@Name = 'equals'][\n    (@Arity = 1\n     and not(FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')])\n     or not(PrimitiveType[@Kind = 'boolean'])\n    ) or (\n     @Arity = 2\n     and PrimitiveType[@Kind = 'boolean']\n     and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]\n     and not(pmd-java:hasAnnotation('java.lang.Override'))\n    )\n]\n| //MethodDeclaration[@Name = 'equal'][\n    @Arity = 1\n    and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]\n]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/SuspiciousEqualsMethodName"
+    },
+    "SuspiciousHashcodeMethodName": {
+      "id": "SuspiciousHashcodeMethodName",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "The method name and return type are suspiciously close to hashCode()",
+      "description": "The method name and return type are suspiciously close to hashCode(), which may denote an intention to override the hashCode() method.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[\n        lower-case(@Name) = 'hashcode'\n    and @Name != 'hashCode'\n    and @Arity = 0\n    and PrimitiveType[@Kind = 'int']\n]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[\n        lower-case(@Name) = 'hashcode'\n    and @Name != 'hashCode'\n    and @Arity = 0\n    and PrimitiveType[@Kind = 'int']\n]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/SuspiciousHashcodeMethodName"
+    },
+    "UnconditionalIfStatement": {
+      "id": "UnconditionalIfStatement",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Do not use 'if' statements that are always true or always false",
+      "description": "Do not use \"if\" statements whose conditionals are always true or always false.",
+      "priority": 3,
+      "xpath": "//IfStatement[BooleanLiteral[1]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//IfStatement[BooleanLiteral[1]]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/UnconditionalIfStatement"
+    },
+    "UnnecessaryBooleanAssertion": {
+      "id": "UnnecessaryBooleanAssertion",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "assertTrue(true) or similar statements are unnecessary",
+      "description": "A JUnit test assertion with a boolean literal is unnecessary since it always will evaluate to the same thing. Consider using flow control (in case of `assertTrue(false)` or similar) or simply removing statements like `assertTrue(true)` and `assertFalse(false)`. If you just want a test to halt after finding an error, use the `fail()` method and provide an indication message of why it did.",
+      "priority": 3,
+      "xpath": "//ClassDeclaration\n    [pmd-java:typeIs('junit.framework.TestCase')\n     or .//Annotation[pmd-java:typeIs('org.junit.Test')\n                   or pmd-java:typeIs('org.junit.jupiter.api.Test')\n                   or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')\n                   or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')\n                   or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')\n                   or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')\n     ]\n    ]\n    //MethodCall[@MethodName = ('assertTrue', 'assertFalse')]\n        [ArgumentList\n            [\n                BooleanLiteral or\n                UnaryExpression[@Operator = '!'][BooleanLiteral]\n            ]\n        ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassDeclaration\n    [pmd-java:typeIs('junit.framework.TestCase')\n     or .//Annotation[pmd-java:typeIs('org.junit.Test')\n                   or pmd-java:typeIs('org.junit.jupiter.api.Test')\n                   or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')\n                   or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')\n                   or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')\n                   or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')\n     ]\n    ]\n    //MethodCall[@MethodName = ('assertTrue', 'assertFalse')]\n        [ArgumentList\n            [\n                BooleanLiteral or\n                UnaryExpression[@Operator = '!'][BooleanLiteral]\n            ]\n        ]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/UnnecessaryBooleanAssertion"
+    },
+    "UnnecessaryConversionTemporary": {
+      "id": "UnnecessaryConversionTemporary",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Avoid unnecessary temporaries when converting primitives to Strings",
+      "description": "Avoid the use temporary objects when converting primitives to Strings. Use the static conversion methods on the wrapper classes instead.",
+      "priority": 3,
+      "xpath": "//MethodCall[@MethodName = 'toString']\n    [ConstructorCall[position() = 1]\n        [\n            pmd-java:typeIs('java.lang.Integer')\n         or pmd-java:typeIs('java.lang.Long')\n         or pmd-java:typeIs('java.lang.Float')\n         or pmd-java:typeIs('java.lang.Byte')\n         or pmd-java:typeIs('java.lang.Double')\n         or pmd-java:typeIs('java.lang.Short')\n        ]\n    ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[@MethodName = 'toString']\n    [ConstructorCall[position() = 1]\n        [\n            pmd-java:typeIs('java.lang.Integer')\n         or pmd-java:typeIs('java.lang.Long')\n         or pmd-java:typeIs('java.lang.Float')\n         or pmd-java:typeIs('java.lang.Byte')\n         or pmd-java:typeIs('java.lang.Double')\n         or pmd-java:typeIs('java.lang.Short')\n        ]\n    ]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/UnnecessaryConversionTemporary"
+    },
+    "UnusedNullCheckInEquals": {
+      "id": "UnusedNullCheckInEquals",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Invoke equals() on the object you''ve already ensured is not null",
+      "description": "After checking an object reference for null, you should invoke equals() on that object rather than passing it to another object's equals() method.",
+      "priority": 3,
+      "xpath": "//InfixExpression[@Operator = '&&']\n  /MethodCall[pmd-java:matchesSig(\"java.lang.Object#equals(java.lang.Object)\")]\n             [not(StringLiteral)]\n             [not(VariableAccess[@CompileTimeConstant = true()])]\n             [ArgumentList/VariableAccess/@Name = ..//InfixExpression[@Operator = '!='][NullLiteral]/VariableAccess/@Name]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//InfixExpression[@Operator = '&&']\n  /MethodCall[pmd-java:matchesSig(\"java.lang.Object#equals(java.lang.Object)\")]\n             [not(StringLiteral)]\n             [not(VariableAccess[@CompileTimeConstant = true()])]\n             [ArgumentList/VariableAccess/@Name = ..//InfixExpression[@Operator = '!='][NullLiteral]/VariableAccess/@Name]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/UnusedNullCheckInEquals"
+    },
+    "UseCorrectExceptionLogging": {
+      "id": "UseCorrectExceptionLogging",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Use the correct logging statement for logging exceptions",
+      "description": "To make sure the full stacktrace is printed out, use the logging statement with two arguments: a String and a Throwable. This rule only applies to [Apache Commons Logging](https://commons.apache.org/proper/commons-logging/).",
+      "priority": 3,
+      "xpath": "//CatchClause/Block//MethodCall\n    [pmd-java:matchesSig('org.apache.commons.logging.Log#_(java.lang.Object)')]\n    [ArgumentList[not(MethodCall)]//VariableAccess/@Name = ancestor::CatchClause/CatchParameter/@Name]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//CatchClause/Block//MethodCall\n    [pmd-java:matchesSig('org.apache.commons.logging.Log#_(java.lang.Object)')]\n    [ArgumentList[not(MethodCall)]//VariableAccess/@Name = ancestor::CatchClause/CatchParameter/@Name]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/UseCorrectExceptionLogging"
+    },
+    "UseEqualsToCompareStrings": {
+      "id": "UseEqualsToCompareStrings",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "Use equals() to compare strings instead of ''=='' or ''!=''",
+      "description": "Using '==' or '!=' to compare strings is only reliable if the interned string (`String#intern()`) is used on both sides. Use the `equals()` method instead.",
+      "priority": 3,
+      "xpath": "//InfixExpression[@Operator = ('==', '!=')]\n                 [count(*[pmd-java:typeIsExactly('java.lang.String')]) = 2]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//InfixExpression[@Operator = ('==', '!=')]\n                 [count(*[pmd-java:typeIsExactly('java.lang.String')]) = 2]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/UseEqualsToCompareStrings"
+    },
+    "UseLocaleWithCaseConversions": {
+      "id": "UseLocaleWithCaseConversions",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "When doing a String.toLowerCase()/toUpperCase() call, use a Locale",
+      "description": "When doing `String::toLowerCase()/toUpperCase()` conversions, use an explicit locale argument to specify the case transformation rules. Using `String::toLowerCase()` without arguments implicitly uses `Locale::getDefault()`. The problem is that the default locale depends on the current JVM setup (and usually on the system in which it is running). Using the system default may be exactly what you want (e.g. if you are manipulating strings you got through standard input), but it may as well not be the case (e.g. if you are getting the string over the network or a file, and the encoding is well-defined and independent of the environment). In the latter case, using the default locale makes the case transformation brittle, as it may yield unexpected results on a machine whose locale has other case translation rules. For example, in Turkish, the uppercase form of `i` is `İ` (U+0130, not ASCII) and not `I` (U+0049) as in English. The rule is intended to *force* developers to think about locales when dealing with strings. By taking a conscious decision about the choice of locale at the time of writing, you reduce the risk of surprising behaviour down the line, and communicate your intent to future readers.",
+      "priority": 3,
+      "xpath": "//MethodCall[pmd-java:matchesSig(\"java.lang.String#toLowerCase()\") or pmd-java:matchesSig(\"java.lang.String#toUpperCase()\")]\n            [not(MethodCall[@MethodName = \"toHexString\"])]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[pmd-java:matchesSig(\"java.lang.String#toLowerCase()\") or pmd-java:matchesSig(\"java.lang.String#toUpperCase()\")]\n            [not(MethodCall[@MethodName = \"toHexString\"])]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/UseLocaleWithCaseConversions"
+    },
+    "UseProperClassLoader": {
+      "id": "UseProperClassLoader",
+      "language": "java",
+      "category": "Error Prone",
+      "message": "In J2EE, getClassLoader() might not work as expected.  Use Thread.currentThread().getContextClassLoader() instead.",
+      "description": "In J2EE, the getClassLoader() method might not work as expected. Use Thread.currentThread().getContextClassLoader() instead.",
+      "priority": 3,
+      "xpath": "//MethodCall[pmd-java:matchesSig(\"java.lang.Class#getClassLoader()\")]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[pmd-java:matchesSig(\"java.lang.Class#getClassLoader()\")]"
+        }
+      },
+      "sourceFiles": [
+        "errorprone.xml"
+      ],
+      "ref": "category/java/errorprone.xml/UseProperClassLoader"
+    },
+    "AvoidSynchronizedAtMethodLevel": {
+      "id": "AvoidSynchronizedAtMethodLevel",
+      "language": "java",
+      "category": "Multithreading",
+      "message": "Use block level locking rather than method level synchronization",
+      "description": "Method-level synchronization will pin virtual threads and can cause performance problems. Additionally, it can cause problems when new code is added to the method. Block-level ReentrantLock helps to ensure that only the code that needs mutual exclusion will be locked.",
+      "priority": 3,
+      "xpath": "//MethodDeclaration[pmd-java:modifiers() = \"synchronized\"]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodDeclaration[pmd-java:modifiers() = \"synchronized\"]"
+        }
+      },
+      "sourceFiles": [
+        "multithreading.xml"
+      ],
+      "ref": "category/java/multithreading.xml/AvoidSynchronizedAtMethodLevel"
+    },
+    "AvoidSynchronizedStatement": {
+      "id": "AvoidSynchronizedStatement",
+      "language": "java",
+      "category": "Multithreading",
+      "message": "Use ReentrantLock rather than synchronization",
+      "description": "Synchronization will pin virtual threads and can cause performance problems.",
+      "priority": 3,
+      "xpath": "//SynchronizedStatement",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//SynchronizedStatement"
+        }
+      },
+      "sourceFiles": [
+        "multithreading.xml"
+      ],
+      "ref": "category/java/multithreading.xml/AvoidSynchronizedStatement"
+    },
+    "AvoidThreadGroup": {
+      "id": "AvoidThreadGroup",
+      "language": "java",
+      "category": "Multithreading",
+      "message": "Avoid using java.lang.ThreadGroup; it is not thread safe",
+      "description": "Avoid using java.lang.ThreadGroup; although it is intended to be used in a threaded environment it contains methods that are not thread-safe.",
+      "priority": 3,
+      "xpath": "//ConstructorCall/ClassType[pmd-java:typeIs('java.lang.ThreadGroup')]\n| //MethodCall[@MethodName = 'getThreadGroup']",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ConstructorCall/ClassType[pmd-java:typeIs('java.lang.ThreadGroup')]\n| //MethodCall[@MethodName = 'getThreadGroup']"
+        }
+      },
+      "sourceFiles": [
+        "multithreading.xml"
+      ],
+      "ref": "category/java/multithreading.xml/AvoidThreadGroup"
+    },
+    "AvoidUsingVolatile": {
+      "id": "AvoidUsingVolatile",
+      "language": "java",
+      "category": "Multithreading",
+      "message": "Use of modifier volatile is not recommended.",
+      "description": "Use of the keyword 'volatile' is generally used to fine tune a Java application, and therefore, requires a good expertise of the Java Memory Model. Moreover, its range of action is somewhat misknown. Therefore, the volatile keyword should not be used for maintenance purpose and portability.",
+      "priority": 2,
+      "xpath": "//FieldDeclaration[pmd-java:modifiers() = \"volatile\"]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//FieldDeclaration[pmd-java:modifiers() = \"volatile\"]"
+        }
+      },
+      "sourceFiles": [
+        "multithreading.xml"
+      ],
+      "ref": "category/java/multithreading.xml/AvoidUsingVolatile"
+    },
+    "DoNotUseThreads": {
+      "id": "DoNotUseThreads",
+      "language": "java",
+      "category": "Multithreading",
+      "message": "To be compliant to J2EE, a webapp should not use any thread.",
+      "description": "The J2EE specification explicitly forbids the use of threads. Threads are resources, that should be managed and monitored by the J2EE server. If the application creates threads on its own or uses own custom thread pools, then these threads are not managed, which could lead to resource exhaustion. Also, EJBs might be moved between machines in a cluster and only managed resources can be moved along.",
+      "priority": 3,
+      "xpath": "//ClassType\n[pmd-java:typeIs('java.lang.Thread') or pmd-java:typeIs('java.util.concurrent.ExecutorService')]\n(: allow Thread.currentThread().getContextClassLoader() :)\n[not(parent::TypeExpression[parent::MethodCall[pmd-java:matchesSig('_#currentThread()')\n                                               and parent::MethodCall[pmd-java:matchesSig('_#getContextClassLoader()')]\n                                              ]\n                           ]\n)]\n(: exclude duplicated types on the same line :)\n [not((parent::FieldDeclaration|parent::LocalVariableDeclaration)/VariableDeclarator/*[2][pmd-java:typeIs('java.lang.Thread') or pmd-java:typeIs('java.util.concurrent.ExecutorService')])\n or\n  @BeginLine != (parent::FieldDeclaration|parent::LocalVariableDeclaration)/VariableDeclarator/ConstructorCall/ClassType/@BeginLine]\n|\n//MethodCall[*[1][not(pmd-java:nodeIs('MethodCall'))][pmd-java:nodeIs('Expression') and (pmd-java:typeIs('java.util.concurrent.Executors')\n   or pmd-java:typeIs('java.util.concurrent.ExecutorService'))]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ClassType\n[pmd-java:typeIs('java.lang.Thread') or pmd-java:typeIs('java.util.concurrent.ExecutorService')]\n(: allow Thread.currentThread().getContextClassLoader() :)\n[not(parent::TypeExpression[parent::MethodCall[pmd-java:matchesSig('_#currentThread()')\n                                               and parent::MethodCall[pmd-java:matchesSig('_#getContextClassLoader()')]\n                                              ]\n                           ]\n)]\n(: exclude duplicated types on the same line :)\n [not((parent::FieldDeclaration|parent::LocalVariableDeclaration)/VariableDeclarator/*[2][pmd-java:typeIs('java.lang.Thread') or pmd-java:typeIs('java.util.concurrent.ExecutorService')])\n or\n  @BeginLine != (parent::FieldDeclaration|parent::LocalVariableDeclaration)/VariableDeclarator/ConstructorCall/ClassType/@BeginLine]\n|\n//MethodCall[*[1][not(pmd-java:nodeIs('MethodCall'))][pmd-java:nodeIs('Expression') and (pmd-java:typeIs('java.util.concurrent.Executors')\n   or pmd-java:typeIs('java.util.concurrent.ExecutorService'))]]"
+        }
+      },
+      "sourceFiles": [
+        "multithreading.xml"
+      ],
+      "ref": "category/java/multithreading.xml/DoNotUseThreads"
+    },
+    "DontCallThreadRun": {
+      "id": "DontCallThreadRun",
+      "language": "java",
+      "category": "Multithreading",
+      "message": "Don't call Thread.run() explicitly, use Thread.start()",
+      "description": "Explicitly calling Thread.run() method will execute in the caller's thread of control. Instead, call Thread.start() for the intended behavior.",
+      "priority": 4,
+      "xpath": "//MethodCall[ pmd-java:matchesSig(\"java.lang.Thread#run()\") ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[ pmd-java:matchesSig(\"java.lang.Thread#run()\") ]"
+        }
+      },
+      "sourceFiles": [
+        "multithreading.xml"
+      ],
+      "ref": "category/java/multithreading.xml/DontCallThreadRun"
+    },
+    "UseConcurrentHashMap": {
+      "id": "UseConcurrentHashMap",
+      "language": "java",
+      "category": "Multithreading",
+      "message": "If you run in Java5 or newer and have concurrent access, you should use the ConcurrentHashMap implementation",
+      "description": "Since Java5 brought a new implementation of the Map designed for multi-threaded access, you can perform efficient map reads without blocking other threads.",
+      "priority": 3,
+      "xpath": "//VariableDeclarator[VariableId[pmd-java:typeIsExactly('java.util.Map')] and *[2][self::ConstructorCall and not(pmd-java:typeIs('java.util.concurrent.ConcurrentHashMap'))]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//VariableDeclarator[VariableId[pmd-java:typeIsExactly('java.util.Map')] and *[2][self::ConstructorCall and not(pmd-java:typeIs('java.util.concurrent.ConcurrentHashMap'))]]"
+        }
+      },
+      "sourceFiles": [
+        "multithreading.xml"
+      ],
+      "ref": "category/java/multithreading.xml/UseConcurrentHashMap"
+    },
+    "UseNotifyAllInsteadOfNotify": {
+      "id": "UseNotifyAllInsteadOfNotify",
+      "language": "java",
+      "category": "Multithreading",
+      "message": "Call Thread.notifyAll() rather than Thread.notify()",
+      "description": "Thread.notify() awakens a thread monitoring the object. If more than one thread is monitoring, then only one is chosen. The thread chosen is arbitrary; thus it's usually safer to call notifyAll() instead.",
+      "priority": 3,
+      "xpath": "//MethodCall[@MethodName=\"notify\" and ArgumentList[count(*) = 0]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[@MethodName=\"notify\" and ArgumentList[count(*) = 0]]"
+        }
+      },
+      "sourceFiles": [
+        "multithreading.xml"
+      ],
+      "ref": "category/java/multithreading.xml/UseNotifyAllInsteadOfNotify"
+    },
+    "AvoidArrayLoops": {
+      "id": "AvoidArrayLoops",
+      "language": "java",
+      "category": "Performance",
+      "message": "Arrays.copyOf or System.arraycopy are more efficient",
+      "description": "Instead of manually copying data between two arrays, use the more efficient `Arrays.copyOf` or `System.arraycopy` method instead. To copy only part of the array, use `Arrays.copyOfRange` or `System.arraycopy`. If you want to copy/move elements inside the _same_ array (e.g. shift the elements), use `System.arraycopy`.",
+      "priority": 3,
+      "xpath": "//(ForStatement[ForUpdate//(UnaryExpression[@Operator=('++','--')] | AssignmentExpression[@Operator = ('+=', '-=')][NumericLiteral[@Image = '1']])]\n | WhileStatement | DoStatement)\n    [not(.//ContinueStatement)]\n    [not(.//BreakStatement[not(parent::SwitchFallthroughBranch)])]\n    [not(.//ThrowStatement)]\n    [not(.//ReturnStatement)]\n    [count(Block//AssignmentExpression[@Operator='=']\n                                      (: no nested arrays or method calls as array index :)\n                                      [count(ArrayAccess[not(.//ArrayAccess)]\n                                                        [not(.//MethodCall)])=2]\n                                      (: array access indexes must be same (excluding constants) :)\n                                      [deep-equal(\n                                        sort(distinct-values(ArrayAccess[1]/(VariableAccess[2]|InfixExpression//VariableAccess)\n                                            (: don't consider array length accesses :)\n                                            [not(parent::FieldAccess[@Name='length'])]\n                                            [\n                                               (: exclude referenced constants :)\n                                               not(@Name = (ancestor::MethodDeclaration|//FieldDeclaration)//VariableDeclarator[NumericLiteral][not(../../../parent::ForInit)]/VariableId/@Name)\n                                               or\n                                               (: include loop variable :)\n                                               @Name = ancestor::ForStatement/ForInit/LocalVariableDeclaration/VariableDeclarator/VariableId/@Name\n                                            ]\n                                            /@Name)),\n                                        sort(distinct-values(ArrayAccess[2]/(VariableAccess[2]|InfixExpression//VariableAccess)\n                                            (: don't consider array length accesses :)\n                                            [not(parent::FieldAccess[@Name='length'])]\n                                            [\n                                               (: exclude referenced constants :)\n                                               not(@Name = (ancestor::MethodDeclaration|//FieldDeclaration)//VariableDeclarator[NumericLiteral][not(../../../parent::ForInit)]/VariableId/@Name)\n                                               or\n                                               (: include loop variable :)\n                                               @Name = ancestor::ForStatement/ForInit/LocalVariableDeclaration/VariableDeclarator/VariableId/@Name\n                                            ]\n                                            /@Name))\n                                      )]\n     )=1]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//(ForStatement[ForUpdate//(UnaryExpression[@Operator=('++','--')] | AssignmentExpression[@Operator = ('+=', '-=')][NumericLiteral[@Image = '1']])]\n | WhileStatement | DoStatement)\n    [not(.//ContinueStatement)]\n    [not(.//BreakStatement[not(parent::SwitchFallthroughBranch)])]\n    [not(.//ThrowStatement)]\n    [not(.//ReturnStatement)]\n    [count(Block//AssignmentExpression[@Operator='=']\n                                      (: no nested arrays or method calls as array index :)\n                                      [count(ArrayAccess[not(.//ArrayAccess)]\n                                                        [not(.//MethodCall)])=2]\n                                      (: array access indexes must be same (excluding constants) :)\n                                      [deep-equal(\n                                        sort(distinct-values(ArrayAccess[1]/(VariableAccess[2]|InfixExpression//VariableAccess)\n                                            (: don't consider array length accesses :)\n                                            [not(parent::FieldAccess[@Name='length'])]\n                                            [\n                                               (: exclude referenced constants :)\n                                               not(@Name = (ancestor::MethodDeclaration|//FieldDeclaration)//VariableDeclarator[NumericLiteral][not(../../../parent::ForInit)]/VariableId/@Name)\n                                               or\n                                               (: include loop variable :)\n                                               @Name = ancestor::ForStatement/ForInit/LocalVariableDeclaration/VariableDeclarator/VariableId/@Name\n                                            ]\n                                            /@Name)),\n                                        sort(distinct-values(ArrayAccess[2]/(VariableAccess[2]|InfixExpression//VariableAccess)\n                                            (: don't consider array length accesses :)\n                                            [not(parent::FieldAccess[@Name='length'])]\n                                            [\n                                               (: exclude referenced constants :)\n                                               not(@Name = (ancestor::MethodDeclaration|//FieldDeclaration)//VariableDeclarator[NumericLiteral][not(../../../parent::ForInit)]/VariableId/@Name)\n                                               or\n                                               (: include loop variable :)\n                                               @Name = ancestor::ForStatement/ForInit/LocalVariableDeclaration/VariableDeclarator/VariableId/@Name\n                                            ]\n                                            /@Name))\n                                      )]\n     )=1]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/AvoidArrayLoops"
+    },
+    "AvoidCalendarDateCreation": {
+      "id": "AvoidCalendarDateCreation",
+      "language": "java",
+      "category": "Performance",
+      "message": "A Calendar is used to get the current time, this is expensive.",
+      "description": "Problem: `java.util.Calendar` is a heavyweight object and expensive to create. It should only be used, if calendar calculations are needed. Solution: Use `new Date()`, Java 8+ `java.time.LocalDateTime.now()` or `ZonedDateTime.now()`.",
+      "priority": 3,
+      "xpath": "//MethodCall[pmd-java:matchesSig(\"java.util.Calendar#getTime()\") or pmd-java:matchesSig(\"java.util.Calendar#getTimeInMillis()\")]\n  [*[1][local-name() = ('MethodCall', 'ConstructorCall')]\n                               [pmd-java:matchesSig(\"java.util.Calendar#getInstance()\")\n                             or pmd-java:matchesSig(\"java.util.GregorianCalendar#getInstance()\")\n                             or pmd-java:matchesSig(\"java.util.GregorianCalendar#new()\")]\n  ]\n|\n//MethodCall[pmd-java:matchesSig(\"java.util.Calendar#getTime()\") or pmd-java:matchesSig(\"java.util.Calendar#getTimeInMillis()\")]\n   [*[1][local-name() = 'VariableAccess']]\n  (: ignore if .set* or .add or .clear or .roll is called on the variable :)\n  [not(VariableAccess/@Name = ancestor::Block//MethodCall[starts-with(@MethodName, \"set\") or @MethodName = (\"add\", \"clear\", \"roll\")]/VariableAccess/@Name)]\n  (: variable must be initialized with getInstance :)\n  [VariableAccess/@Name = ancestor::Block//LocalVariableDeclaration/VariableDeclarator[\n     (MethodCall | ConstructorCall)\n      [pmd-java:matchesSig(\"java.util.Calendar#getInstance()\")\n       or pmd-java:matchesSig(\"java.util.GregorianCalendar#getInstance()\")\n       or pmd-java:matchesSig(\"java.util.GregorianCalendar#new()\")]\n  ]/VariableId/@Name]\n|\n//ConstructorCall[pmd-java:typeIs(\"org.joda.time.DateTime\") or pmd-java:typeIs(\"org.joda.time.LocalDateTime\")]\n  [ArgumentList[(MethodCall | ConstructorCall)\n       [pmd-java:matchesSig(\"java.util.Calendar#getInstance()\")\n     or pmd-java:matchesSig(\"java.util.GregorianCalendar#getInstance()\")\n     or pmd-java:matchesSig(\"java.util.GregorianCalendar#new()\")]]\n  ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[pmd-java:matchesSig(\"java.util.Calendar#getTime()\") or pmd-java:matchesSig(\"java.util.Calendar#getTimeInMillis()\")]\n  [*[1][local-name() = ('MethodCall', 'ConstructorCall')]\n                               [pmd-java:matchesSig(\"java.util.Calendar#getInstance()\")\n                             or pmd-java:matchesSig(\"java.util.GregorianCalendar#getInstance()\")\n                             or pmd-java:matchesSig(\"java.util.GregorianCalendar#new()\")]\n  ]\n|\n//MethodCall[pmd-java:matchesSig(\"java.util.Calendar#getTime()\") or pmd-java:matchesSig(\"java.util.Calendar#getTimeInMillis()\")]\n   [*[1][local-name() = 'VariableAccess']]\n  (: ignore if .set* or .add or .clear or .roll is called on the variable :)\n  [not(VariableAccess/@Name = ancestor::Block//MethodCall[starts-with(@MethodName, \"set\") or @MethodName = (\"add\", \"clear\", \"roll\")]/VariableAccess/@Name)]\n  (: variable must be initialized with getInstance :)\n  [VariableAccess/@Name = ancestor::Block//LocalVariableDeclaration/VariableDeclarator[\n     (MethodCall | ConstructorCall)\n      [pmd-java:matchesSig(\"java.util.Calendar#getInstance()\")\n       or pmd-java:matchesSig(\"java.util.GregorianCalendar#getInstance()\")\n       or pmd-java:matchesSig(\"java.util.GregorianCalendar#new()\")]\n  ]/VariableId/@Name]\n|\n//ConstructorCall[pmd-java:typeIs(\"org.joda.time.DateTime\") or pmd-java:typeIs(\"org.joda.time.LocalDateTime\")]\n  [ArgumentList[(MethodCall | ConstructorCall)\n       [pmd-java:matchesSig(\"java.util.Calendar#getInstance()\")\n     or pmd-java:matchesSig(\"java.util.GregorianCalendar#getInstance()\")\n     or pmd-java:matchesSig(\"java.util.GregorianCalendar#new()\")]]\n  ]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/AvoidCalendarDateCreation"
+    },
+    "AvoidFileStream": {
+      "id": "AvoidFileStream",
+      "language": "java",
+      "category": "Performance",
+      "message": "Avoid instantiating FileInputStream, FileOutputStream, FileReader, or FileWriter",
+      "description": "The FileInputStream and FileOutputStream classes contains a finalizer method which will cause garbage collection pauses. See [JDK-8080225](https://bugs.openjdk.org/browse/JDK-8080225) for details. The FileReader and FileWriter constructors instantiate FileInputStream and FileOutputStream, again causing garbage collection issues while finalizer methods are called. * Use `Files.newInputStream(Paths.get(fileName))` instead of `new FileInputStream(fileName)`. * Use `Files.newOutputStream(Paths.get(fileName))` instead of `new FileOutputStream(fileName)`. * Use `Files.newBufferedReader(Paths.get(fileName))` instead of `new FileReader(fileName)`. * Use `Files.newBufferedWriter(Paths.get(fileName))` instead of `new FileWriter(fileName)`. Please note, that the `java.nio` API does not throw a `FileNotFoundException` anymore, instead it throws a `NoSuchFileException`. If your code dealt explicitly with a `FileNotFoundException`, then this needs to be adjusted. Both exceptions are subclasses of `IOException`, so catching that one covers both.",
+      "priority": 1,
+      "xpath": "//ConstructorCall/ClassType[\n       pmd-java:typeIs('java.io.FileInputStream')\n    or pmd-java:typeIs('java.io.FileOutputStream')\n    or pmd-java:typeIs('java.io.FileReader')\n    or pmd-java:typeIs('java.io.FileWriter')\n  ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ConstructorCall/ClassType[\n       pmd-java:typeIs('java.io.FileInputStream')\n    or pmd-java:typeIs('java.io.FileOutputStream')\n    or pmd-java:typeIs('java.io.FileReader')\n    or pmd-java:typeIs('java.io.FileWriter')\n  ]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/AvoidFileStream"
+    },
+    "OptimizableToArrayCall": {
+      "id": "OptimizableToArrayCall",
+      "language": "java",
+      "category": "Performance",
+      "message": "This call to Collection.toArray() may be optimizable",
+      "description": "Calls to a collection's `toArray(E[])` method should specify a target array of zero size. This allows the JVM to optimize the memory allocation and copying as much as possible. Previous versions of this rule (pre PMD 6.0.0) suggested the opposite, but current JVM implementations perform always better, when they have full control over the target array. And allocation an array via reflection is nowadays as fast as the direct allocation. See also [Arrays of Wisdom of the Ancients](https://shipilev.net/blog/2016/arrays-wisdom-ancients/) Note: If you don't need an array of the correct type, then the simple `toArray()` method without an array is faster, but returns only an array of type `Object[]`.",
+      "priority": 3,
+      "xpath": "//MethodCall[pmd-java:matchesSig(\"java.util.Collection#toArray(_)\")]\n    [ArgumentList/ArrayAllocation/ArrayType/ArrayDimensions/ArrayDimExpr[not(NumericLiteral[@Image=\"0\"])]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[pmd-java:matchesSig(\"java.util.Collection#toArray(_)\")]\n    [ArgumentList/ArrayAllocation/ArrayType/ArrayDimensions/ArrayDimExpr[not(NumericLiteral[@Image=\"0\"])]]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/OptimizableToArrayCall"
+    },
+    "StringToString": {
+      "id": "StringToString",
+      "language": "java",
+      "category": "Performance",
+      "message": "Avoid calling toString() on String objects; this is unnecessary.",
+      "description": "Avoid calling toString() on objects already known to be string instances; this is unnecessary.",
+      "priority": 3,
+      "xpath": "//MethodCall[pmd-java:matchesSig(\"java.lang.String#toString()\")]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[pmd-java:matchesSig(\"java.lang.String#toString()\")]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/StringToString"
+    },
+    "UseArrayListInsteadOfVector": {
+      "id": "UseArrayListInsteadOfVector",
+      "language": "java",
+      "category": "Performance",
+      "message": "Use ArrayList instead of Vector",
+      "description": "ArrayList is a much better Collection implementation than Vector if thread-safe operation is not required.",
+      "priority": 3,
+      "xpath": "//ConstructorCall/ClassType[pmd-java:typeIsExactly('java.util.Vector') or pmd-java:typeIsExactly('Vector')]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ConstructorCall/ClassType[pmd-java:typeIsExactly('java.util.Vector') or pmd-java:typeIsExactly('Vector')]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/UseArrayListInsteadOfVector"
+    },
+    "UseArraysAsList": {
+      "id": "UseArraysAsList",
+      "language": "java",
+      "category": "Performance",
+      "message": "Use asList instead of tight loops",
+      "description": "The `java.util.Arrays` class has a `asList()` method that should be used when you want to create a new List from an array of objects. It is faster than executing a loop to copy all the elements of the array one by one. Note that the result of `Arrays.asList()` is backed by the specified array, changes in the returned list will result in the array to be modified. For that reason, it is not possible to add new elements to the returned list of `Arrays.asList()` (UnsupportedOperationException). You must use `new ArrayList<>(Arrays.asList(...))` if that is inconvenient for you (e.g. because of concurrent access).",
+      "priority": 3,
+      "xpath": "//ForStatement\n  [ForInit\n    [LocalVariableDeclaration\n      [PrimitiveType[@Kind = 'int']]\n      [VariableDeclarator[NumericLiteral[@IntLiteral][@Image = '0']]]\n    ]\n  ]\n  [*[2]//FieldAccess[@Name = 'length']/VariableAccess[pmd-java:typeIs(\"java.lang.Object[]\")]]\n  [ForUpdate\n    [StatementExpressionList\n      [UnaryExpression[@Operator = '++']\n       | AssignmentExpression[@Operator = '+='][NumericLiteral[@IntLiteral][@Image = '1']]]\n    ]\n  ]\n  /*[last()][not(IfStatement)]/ExpressionStatement/\n    MethodCall\n      [pmd-java:matchesSig('java.util.List#add(_)')]\n      [ArgumentList/ArrayAccess\n        [VariableAccess[@Name = ancestor::ForStatement/ForInit/LocalVariableDeclaration/VariableDeclarator/VariableId/@Name]]\n      ]\n|\n//ForeachStatement\n  [VariableAccess[pmd-java:typeIs(\"java.lang.Object[]\")]]\n  /*[last()][not(IfStatement)]/ExpressionStatement/MethodCall\n      [pmd-java:matchesSig('java.util.List#add(_)')]\n      [ArgumentList\n        [VariableAccess[@Name = ancestor::ForeachStatement/LocalVariableDeclaration/VariableDeclarator/VariableId/@Name]]\n      ]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//ForStatement\n  [ForInit\n    [LocalVariableDeclaration\n      [PrimitiveType[@Kind = 'int']]\n      [VariableDeclarator[NumericLiteral[@IntLiteral][@Image = '0']]]\n    ]\n  ]\n  [*[2]//FieldAccess[@Name = 'length']/VariableAccess[pmd-java:typeIs(\"java.lang.Object[]\")]]\n  [ForUpdate\n    [StatementExpressionList\n      [UnaryExpression[@Operator = '++']\n       | AssignmentExpression[@Operator = '+='][NumericLiteral[@IntLiteral][@Image = '1']]]\n    ]\n  ]\n  /*[last()][not(IfStatement)]/ExpressionStatement/\n    MethodCall\n      [pmd-java:matchesSig('java.util.List#add(_)')]\n      [ArgumentList/ArrayAccess\n        [VariableAccess[@Name = ancestor::ForStatement/ForInit/LocalVariableDeclaration/VariableDeclarator/VariableId/@Name]]\n      ]\n|\n//ForeachStatement\n  [VariableAccess[pmd-java:typeIs(\"java.lang.Object[]\")]]\n  /*[last()][not(IfStatement)]/ExpressionStatement/MethodCall\n      [pmd-java:matchesSig('java.util.List#add(_)')]\n      [ArgumentList\n        [VariableAccess[@Name = ancestor::ForeachStatement/LocalVariableDeclaration/VariableDeclarator/VariableId/@Name]]\n      ]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/UseArraysAsList"
+    },
+    "UseIOStreamsWithApacheCommonsFileItem": {
+      "id": "UseIOStreamsWithApacheCommonsFileItem",
+      "language": "java",
+      "category": "Performance",
+      "message": "Avoid memory intensive FileItem.get() or FileItem.getString()",
+      "description": "Problem: Use of [FileItem.get()](https://javadoc.io/static/commons-fileupload/commons-fileupload/1.5/org/apache/commons/fileupload/FileItem.html#get--) and [FileItem.getString()](https://javadoc.io/static/commons-fileupload/commons-fileupload/1.5/org/apache/commons/fileupload/FileItem.html#getString--) could exhaust memory since they load the entire file into memory. Solution: Use [FileItem.getInputStream()](https://javadoc.io/static/commons-fileupload/commons-fileupload/1.5/org/apache/commons/fileupload/FileItem.html#getInputStream--) and buffering.",
+      "priority": 3,
+      "xpath": "//MethodCall\n    [@MethodName = 'get' or @MethodName = 'getString']\n    [*[pmd-java:typeIs('org.apache.commons.fileupload.FileItem')]]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall\n    [@MethodName = 'get' or @MethodName = 'getString']\n    [*[pmd-java:typeIs('org.apache.commons.fileupload.FileItem')]]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/UseIOStreamsWithApacheCommonsFileItem"
+    },
+    "UseStringBufferLength": {
+      "id": "UseStringBufferLength",
+      "language": "java",
+      "category": "Performance",
+      "message": "This is an inefficient use of CharSequence.toString; call CharSequence.length instead.",
+      "description": "Use StringBuffer.length() to determine StringBuffer length rather than using StringBuffer.toString().equals(\"\") or StringBuffer.toString().length() == ...",
+      "priority": 3,
+      "xpath": "//MethodCall[pmd-java:matchesSig('_#length()')\n    and MethodCall[pmd-java:matchesSig('java.lang.CharSequence#toString()')]]\n|\n(: finds sb.toString().equals(someVar) where var is a final variable initialized with literal \"\" :)\n//MethodCall[pmd-java:matchesSig('_#equals(_)')\n  and MethodCall[pmd-java:matchesSig('java.lang.AbstractStringBuilder#toString()')]\n  and ArgumentList/VariableAccess[@Name = //VariableDeclarator[StringLiteral[@Image='\"\"']]\n                                            /VariableId[pmd-java:modifiers() = 'final']/@Name]]\n|\n(: finds sb.toString().equals(\"\") :)\n//MethodCall[pmd-java:matchesSig('_#equals(_)')\n  and MethodCall[pmd-java:matchesSig('java.lang.AbstractStringBuilder#toString()')]\n  and ArgumentList/StringLiteral[@Image='\"\"']]",
+      "properties": {
+        "xpath": {
+          "type": "String",
+          "default": "//MethodCall[pmd-java:matchesSig('_#length()')\n    and MethodCall[pmd-java:matchesSig('java.lang.CharSequence#toString()')]]\n|\n(: finds sb.toString().equals(someVar) where var is a final variable initialized with literal \"\" :)\n//MethodCall[pmd-java:matchesSig('_#equals(_)')\n  and MethodCall[pmd-java:matchesSig('java.lang.AbstractStringBuilder#toString()')]\n  and ArgumentList/VariableAccess[@Name = //VariableDeclarator[StringLiteral[@Image='\"\"']]\n                                            /VariableId[pmd-java:modifiers() = 'final']/@Name]]\n|\n(: finds sb.toString().equals(\"\") :)\n//MethodCall[pmd-java:matchesSig('_#equals(_)')\n  and MethodCall[pmd-java:matchesSig('java.lang.AbstractStringBuilder#toString()')]\n  and ArgumentList/StringLiteral[@Image='\"\"']]"
+        }
+      },
+      "sourceFiles": [
+        "performance.xml"
+      ],
+      "ref": "category/java/performance.xml/UseStringBufferLength"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+GenericsNaming (replaced by TypeParameterNamingConventions)
+AvoidCatchingNPE (subsumed by AvoidCatchingGenericException)
+AvoidCatchingThrowable (subsumed by AvoidCatchingGenericException)
+AvoidLosingExceptionInformation (replaced by UselessPureMethodCall)
