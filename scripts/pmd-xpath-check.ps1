@@ -2,10 +2,10 @@
 pmd-xpath-check.ps1
 
 Example:
-  .\pmd-xpath-check.ps1 `
-    -PmdBin "C:\Users\vidar\tools\pmd-bin-7.20.0\bin\pmd.bat" `
-    -Target "C:\Users\vidar\repo\TestExample.java" `
-    -XPath "//MethodDeclaration[child::PrimitiveType[1][@Kind='int']]"
+  .\scripts\pmd-xpath-check.ps1 `
+    -PmdBin "path\to\pmd.bat" `
+    -Target "path\to\java\fileOrDir" `
+    -XPath "//Some/Expression" `
 #>
 
 param(
@@ -21,7 +21,7 @@ param(
     [ValidateSet("text", "json", "xml")]
     [string]$Format = "json",
 
-    [string]$OutReport = ""
+    [string]$OutReport = ".\out"
 )
 
 # Enable strict mode to catch undefined variables and other mistakes early that could lead to silent failures.
@@ -29,7 +29,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 function New-TempDirectory {
-    # Each run gets its own temp workspace, so no file conflicts occur.
+    # Each run gets its own temp workspace, to avoid cluttering the repo with generated files.
     $base = Join-Path ([System.IO.Path]::GetTempPath()) "pmd-xpath-check"
     $dir = Join-Path $base ([System.Guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -39,8 +39,8 @@ function New-TempDirectory {
 function Read-FileOrEmpty([string]$Path) {
     # Safely read a file's content, returning an empty string if the file doesn't exist.
     # PMD may not produce certain output files if it crashes or encounters errors.
-    # By returning an empty string instead of throwing an error, we allow the script to continue
-    # and analyze other signals (like exit code and stderr) to determine what went wrong.
+    # By returning an empty string instead of throwing an error,
+    # we allow the script to continue and analyze other signals (like exit code and stderr) to determine what went wrong.
     if (Test-Path $Path) {
         return Get-Content $Path -Raw
     }
@@ -49,8 +49,8 @@ function Read-FileOrEmpty([string]$Path) {
 
 function Snip([string]$s, [int]$n) {
     # Truncate output to prevent overwhelming JSON payloads.
-    # PMD may print large stack traces or logs to stdout/stderr, and including the full output
-    # in the JSON result can make the JSON file enormous and difficult to parse.
+    # PMD may print large stack traces or logs to stdout/stderr,
+    # and including the full output in the JSON result can make the JSON file enormous and difficult to parse.
     if ($null -eq $s) { return "" }
     $s = [string]$s
     if ($s.Length -le $n) { return $s }
@@ -60,9 +60,32 @@ function Snip([string]$s, [int]$n) {
 function Write-Utf8NoBom([string]$Path, [string]$Content) {
     # Write UTF-8 text without a Byte Order Mark (BOM).
     # PMD's XML parser is strict about BOM. If a UTF-8 file contains the 3-byte BOM (\xEF\xBB\xBF),
-    # the parser may reject the file as invalid, causing ruleset loading to fail. By explicitly using
-    # UTF8Encoding(false), we ensure no BOM is written, guaranteeing PMD can parse our ruleset.
+    # the parser may reject the file as invalid, causing ruleset loading to fail.
+    # By explicitly using UTF8Encoding(false), we ensure no BOM is written, guaranteeing PMD can parse our ruleset.
     [System.IO.File]::WriteAllText($Path, $Content, (New-Object System.Text.UTF8Encoding($false)))
+}
+
+function Remove-ViolationPriorityFromJsonReport([string]$Path) {
+    # Removes the PMD-emitted priority property from the violation reports,
+    # because it always resorts to a default value, and is not relevant to the validation of the XPath rule itself.
+    if (-not (Test-Path $Path)) { return }
+
+    try {
+        $report = Get-Content $Path -Raw | ConvertFrom-Json
+    }
+    catch {
+        return
+    }
+
+    foreach ($file in @($report.files)) {
+        foreach ($v in @($file.violations)) {
+            if ($null -ne $v -and $v.PSObject.Properties["priority"]) {
+                $v.PSObject.Properties.Remove("priority")
+            }
+        }
+    }
+
+    Write-Utf8NoBom -Path $Path -Content ($report | ConvertTo-Json -Depth 100)
 }
 
 # Validate the target upfront before passing to PMD.
@@ -87,9 +110,40 @@ else {
 
 $work = New-TempDirectory
 $rulesetPath = Join-Path $work "llm-rule.xml"
-$reportPath = if ($OutReport) { $OutReport } else { Join-Path $work "report.$Format" }
 $stdoutPath = Join-Path $work "pmd.stdout.txt"
 $stderrPath = Join-Path $work "pmd.stderr.txt"
+
+# If OutReport is a directory, write a default filename inside it.
+# If OutReport is empty, default to a report file inside the temp workspace.
+$reportPath = $null
+
+if (-not $OutReport) {
+    $reportPath = Join-Path $work "report.$Format"
+}
+else {
+    $resolvedOut = $OutReport
+
+    # If the user passed a directory, place a file inside it
+    if (Test-Path $resolvedOut -PathType Container) {
+        $reportPath = Join-Path $resolvedOut ("report.{0}" -f $Format)
+    }
+    else {
+        # If it doesn't exist yet, decide based on whether it looks like a directory path
+        $endsWithSep = $resolvedOut.EndsWith("\") -or $resolvedOut.EndsWith("/")
+        $hasExt = [System.IO.Path]::HasExtension($resolvedOut)
+
+        if ($endsWithSep -or -not $hasExt) {
+            New-Item -ItemType Directory -Force -Path $resolvedOut | Out-Null
+            $reportPath = Join-Path $resolvedOut ("report.{0}" -f $Format)
+        }
+        else {
+            # Treat as file path; ensure parent directory exists
+            $parent = Split-Path $resolvedOut -Parent
+            if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+            $reportPath = $resolvedOut
+        }
+    }
+}
 
 # Generate a minimal but valid PMD 7.20.0 ruleset.
 # Each run dynamically creates a ruleset containing only the user-provided XPath rule.
@@ -132,6 +186,11 @@ $cmdLine = '"' + $PmdBin + '" ' + $quotedArgs + ' 1>"' + $stdoutPath + '" 2>"' +
 & $env:ComSpec /c $cmdLine
 # After execution, PMD's exit code indicates the overall result
 $exitCode = $LASTEXITCODE
+
+# Normalize JSON report payload to remove per-violation priority metadata.
+if ($Format -eq "json") {
+    Remove-ViolationPriorityFromJsonReport -Path $reportPath
+}
 
 # Load captured stdout and stderr for post-analysis.
 # PMD produces both a structured JSON report and a log output to stderr.
@@ -212,11 +271,19 @@ $configErrorPattern = @(
     "Unknown function",
     "Unknown namespace",
     "XPath.*(error|compile|parse)",
-    "SAXParseException"
+    "SAXParseException",
+    "Exception while initializing rule"
 ) -join "|"
 
 # Signal 3: Detect configuration/compilation errors in stderr and stdout.
 $hasConfigErrorText = ($stderr -match $configErrorPattern) -or ($stdout -match $configErrorPattern)
+
+# Make hadConfigErrors reflect BOTH JSON report + stderr evidence
+$hadConfigErrors = $hadConfigErrors -or $hasConfigErrorText
+if ($hasConfigErrorText -and $configErrorCount -eq 0) {
+    # optional: expose that the count came from stderr, not the report
+    $configErrorCount = 1
+}
 
 # Determine syntactic validity of the rule configuration.
 # We distinguish between a rule being valid (well-formed XPath, proper XML) and the analysis being complete (target files parsed successfully).
@@ -229,20 +296,20 @@ $syntacticValid = -not ($hadConfigErrors -or $hasConfigErrorText)
 $status = if ($syntacticValid) { "valid" } else { "invalid" }
 
 [ordered]@{
-    status                         = $status
-    syntacticValid                 = $syntacticValid
-    exitCode                       = $exitCode
-    violationCount                 = $violationCount
-    hadConfigErrors                = $hadConfigErrors
-    configErrorCount               = $configErrorCount
-    hadProcessingErrors            = $hadProcErrors
-    processingErrorCountJSONReport = $processingErrorCountReport
-    processingErrorCountStderr     = $processingErrorCountStderr
-    rulesetPath                    = $rulesetPath
-    reportPath                     = $reportPath
-    stdoutPath                     = $stdoutPath
-    stderrPath                     = $stderrPath
-    stdoutSnippet                  = (Snip $stdout 1200)
-    stderrSnippet                  = (Snip $stderr 1200)
+    status                     = $status
+    syntacticValid             = $syntacticValid
+    exitCode                   = $exitCode
+    violationCount             = $violationCount
+    hadConfigErrors            = $hadConfigErrors
+    configErrorCount           = $configErrorCount
+    hadProcessingErrors        = $hadProcErrors
+    processingErrorCountReport = $processingErrorCountReport
+    processingErrorCountStderr = $processingErrorCountStderr
+    rulesetPath                = $rulesetPath
+    reportPath                 = $reportPath
+    stdoutPath                 = $stdoutPath
+    stderrPath                 = $stderrPath
+    stdoutSnippet              = (Snip $stdout 1200)
+    stderrSnippet              = (Snip $stderr 1200)
 } | ConvertTo-Json -Depth 10
 
