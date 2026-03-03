@@ -4,20 +4,27 @@
 # Usage:
 #   .\scripts\validate-llm-generated-xpaths.ps1 `
 #     -GeneratedJsonl path\to\llm-generated-xpaths.jsonl `
-#     -OutJsonl path\where\to\write\results.jsonl `
 #     -PmdXPathCheck .\scripts\pmd-xpath-check.ps1 `
 #     -PmdBin "path\to\pmd.bat" `
-#     -Target "path\to\java\fileOrDir" `
+#     -Target "path\to\java\fileOrDir"
+#
+# Default output layout per run:
+#   .\out\evaluated-llm-rules_<input-name>_<timestamp>\
+#     results.jsonl
+#     reports\<ruleKey>.json
 
 param(
     [Parameter(Mandatory = $true)][string]$GeneratedJsonl,
-    [Parameter(Mandatory = $true)][string]$OutJsonl,
     [Parameter(Mandatory = $true)][string]$PmdXPathCheck,
     [Parameter(Mandatory = $true)][string]$PmdBin,
     [Parameter(Mandatory = $true)][string]$Target,
 
-    # Optional: where to store per-rule PMD JSON reports
-    [string]$ReportsDir = ".\out\evaluated-llm-rules\reports"
+    # Optional: base directory for one validation run.
+    [string]$OutDir = "",
+    # Optional: override path for JSONL results file.
+    [string]$OutJsonl = "",
+    # Optional: override path for per-rule PMD JSON reports.
+    [string]$ReportsDir = ""
 )
 
 # Enable strict mode to catch undefined variables and other mistakes early that could lead to silent failures.
@@ -36,6 +43,33 @@ function ConvertTo-SafeFileName([string]$s) {
     $invalid = [System.IO.Path]::GetInvalidFileNameChars()
     foreach ($c in $invalid) { $s = $s.Replace([string]$c, "_") }
     return $s
+}
+
+function Get-Timestamp() {
+    # Get current timestamp in YYYYmmdd-HHmmss format for run folder names.
+    return (Get-Date).ToString("yyyyMMdd-HHmmss")
+}
+
+if (-not (Test-Path $GeneratedJsonl)) { throw "GeneratedJsonl does not exist: $GeneratedJsonl" }
+if (-not (Test-Path $PmdXPathCheck)) { throw "PmdXPathCheck does not exist: $PmdXPathCheck" }
+if (-not (Test-Path $Target)) { throw "Target does not exist: $Target" }
+
+# Auto-generate a per-run output directory when one is not provided.
+if (-not $OutDir) {
+    $inputItem = Get-Item $GeneratedJsonl
+    $inputName = [System.IO.Path]::GetFileNameWithoutExtension($inputItem.Name)
+    $baseOut = Join-Path (Get-Location) "out"
+    $OutDir = Join-Path $baseOut ("evaluated-llm-rules_{0}_{1}" -f $inputName, (Get-Timestamp))
+}
+
+New-Dir $OutDir
+
+# Default results/report locations live under the run directory.
+if (-not $OutJsonl) {
+    $OutJsonl = Join-Path $OutDir "results.jsonl"
+}
+if (-not $ReportsDir) {
+    $ReportsDir = Join-Path $OutDir "reports"
 }
 
 # Initialize output file (truncate if exists) so we always start fresh
@@ -98,3 +132,7 @@ Get-Content -Path $GeneratedJsonl -Encoding UTF8 | ForEach-Object {
     # Append the merged row as a single JSON line (JSONL format)
     ($row | ConvertTo-Json -Depth 20 -Compress) | Add-Content -Path $OutJsonl -Encoding UTF8
 }
+
+Write-Host "Validation output written to:" -ForegroundColor Green
+Write-Host ("  Results JSONL: {0}" -f (Resolve-Path $OutJsonl).Path) -ForegroundColor Green
+Write-Host ("  Per-rule reports: {0}" -f (Resolve-Path $ReportsDir).Path) -ForegroundColor Green

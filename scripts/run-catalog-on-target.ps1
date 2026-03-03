@@ -212,7 +212,6 @@ foreach ($ruleKey in $ruleKeys) {
         # Rule identification and metadata from catalog
         ruleKey                    = $ruleKey                          # Rule name
         category                   = $rule.category                    # Category (Best Practices, Performance, etc.)
-        priority                   = $rule.priority                    # Priority level (1-5)
         ref                        = $rule.ref                         # Reference URL to PMD documentation
         sourceFiles                = $rule.sourceFiles                 # Source file(s)
         message                    = $rule.message                     # Rule message template
