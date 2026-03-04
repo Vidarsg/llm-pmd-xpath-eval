@@ -297,8 +297,10 @@ if ($Format -eq "json" -and (Test-Path $reportPath)) {
         $violationCount = $count
 
         # Count configuration errors and processing errors from the JSON report.
-        $configErrorCount = (@($j.configurationErrors)).Count
-        $processingErrorCountReport = (@($j.processingErrors)).Count
+        $configErrorsProp = $j.PSObject.Properties["configurationErrors"]
+        $processingErrorsProp = $j.PSObject.Properties["processingErrors"]
+        $configErrorCount = if ($null -ne $configErrorsProp) { @($configErrorsProp.Value).Count } else { 0 }
+        $processingErrorCountReport = if ($null -ne $processingErrorsProp) { @($processingErrorsProp.Value).Count } else { 0 }
         # Flags indicating whether configuration errors or processing errors were present according to the JSON report.
         $hadConfigErrors = $configErrorCount -gt 0
         $hadProcErrors = $processingErrorCountReport -gt 0
