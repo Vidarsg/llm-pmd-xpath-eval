@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import sys
+import time
 
 import requests
 
@@ -43,6 +44,7 @@ Output format:
 
 
 def main() -> int:
+    start_time = time.time()
 
     # Parse command-line arguments
     ap = argparse.ArgumentParser()
@@ -130,6 +132,8 @@ def main() -> int:
             out = {"ruleKey": rule_key, "description": desc, "xpath": xpath}
             fout.write(json.dumps(out, ensure_ascii=False) + "\n")
 
+    elapsed = time.time() - start_time
+    print(f"Completed in {elapsed:.2f} seconds")
     return 0
 
 

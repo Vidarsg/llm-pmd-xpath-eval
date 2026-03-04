@@ -30,6 +30,7 @@ param(
 # Enable strict mode to catch undefined variables and other mistakes early that could lead to silent failures.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 # Create directory if it doesn't exist (like mkdir -p in Unix)
 function New-Dir([string]$p) {
@@ -136,3 +137,5 @@ Get-Content -Path $GeneratedJsonl -Encoding UTF8 | ForEach-Object {
 Write-Host "Validation output written to:" -ForegroundColor Green
 Write-Host ("  Results JSONL: {0}" -f (Resolve-Path $OutJsonl).Path) -ForegroundColor Green
 Write-Host ("  Per-rule reports: {0}" -f (Resolve-Path $ReportsDir).Path) -ForegroundColor Green
+$stopwatch.Stop()
+Write-Host ("  Runtime: {0:c}" -f $stopwatch.Elapsed) -ForegroundColor Green

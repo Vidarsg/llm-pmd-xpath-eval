@@ -54,6 +54,7 @@ param(
 # Enable strict mode to catch undefined variables and other mistakes early that could lead to silent failures.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 
 # Create directory if it doesn't exist (like mkdir -p in Unix)
@@ -249,3 +250,6 @@ foreach ($ruleKey in $ruleKeys) {
         Write-Host ("Processed {0}/{1} rules..." -f $processed, @($ruleKeys).Count) -ForegroundColor Cyan
     }
 }
+
+$stopwatch.Stop()
+Write-Host ("Runtime: {0:c}" -f $stopwatch.Elapsed) -ForegroundColor Green

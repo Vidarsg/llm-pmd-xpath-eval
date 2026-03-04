@@ -88,6 +88,81 @@ function Remove-ViolationPriorityFromJsonReport([string]$Path) {
     Write-Utf8NoBom -Path $Path -Content ($report | ConvertTo-Json -Depth 100)
 }
 
+function Remove-UnhelpfulPmdJsonFields([string]$Path) {
+    # PMD keeps these top-level arrays in the JSON schema even when they are empty.
+    # For this workflow they are misleading, since config/processing issues are derived more reliably from stderr and surfaced via script-added fields.
+    if (-not (Test-Path $Path)) { return }
+
+    try {
+        $report = Get-Content $Path -Raw | ConvertFrom-Json
+    }
+    catch {
+        return
+    }
+
+    foreach ($name in @("suppressedViolations", "processingErrors", "configurationErrors")) {
+        if ($report.PSObject.Properties[$name]) {
+            $report.PSObject.Properties.Remove($name)
+        }
+    }
+
+    Write-Utf8NoBom -Path $Path -Content ($report | ConvertTo-Json -Depth 100)
+}
+
+function Add-ScriptDetectedErrorsToJsonReport(
+    [string]$Path,
+    [bool]$HadConfigErrors,
+    [int]$ConfigErrorCount,
+    [bool]$HadProcessingErrors,
+    [int]$ProcessingErrorCountReport,
+    [int]$ProcessingErrorCountStderr,
+    [bool]$HadProcessingErrorsExitCode,
+    [string]$StdoutSnippet,
+    [string]$StderrSnippet
+) {
+    # PMD's native JSON report does not always populate configurationErrors /
+    # processingErrors consistently, even when stderr clearly shows them.
+    # Add a top-level section with the script's diagnosis.
+    if (-not (Test-Path $Path)) { return }
+
+    try {
+        $report = Get-Content $Path -Raw | ConvertFrom-Json
+    }
+    catch {
+        return
+    }
+
+    $configSection = [pscustomobject]@{
+        hadConfigErrors = $HadConfigErrors
+        count           = $ConfigErrorCount
+        stderrSnippet   = $StderrSnippet
+    }
+    $processingSection = [pscustomobject]@{
+        hadProcessingErrors = $HadProcessingErrors
+        countFromReport     = $ProcessingErrorCountReport
+        countFromStderr     = $ProcessingErrorCountStderr
+        detectedViaExitCode = $HadProcessingErrorsExitCode
+        stdoutSnippet       = $StdoutSnippet
+        stderrSnippet       = $StderrSnippet
+    }
+
+    if ($report.PSObject.Properties["scriptDetectedConfigurationErrors"]) {
+        $report.scriptDetectedConfigurationErrors = $configSection
+    }
+    else {
+        $report | Add-Member -NotePropertyName "scriptDetectedConfigurationErrors" -NotePropertyValue $configSection
+    }
+
+    if ($report.PSObject.Properties["scriptDetectedProcessingErrors"]) {
+        $report.scriptDetectedProcessingErrors = $processingSection
+    }
+    else {
+        $report | Add-Member -NotePropertyName "scriptDetectedProcessingErrors" -NotePropertyValue $processingSection
+    }
+
+    Write-Utf8NoBom -Path $Path -Content ($report | ConvertTo-Json -Depth 100)
+}
+
 # Validate the target upfront before passing to PMD.
 if (-not (Test-Path $Target)) {
     throw "Target does not exist: $Target"
@@ -190,6 +265,7 @@ $exitCode = $LASTEXITCODE
 # Normalize JSON report payload to remove per-violation priority metadata.
 if ($Format -eq "json") {
     Remove-ViolationPriorityFromJsonReport -Path $reportPath
+    Remove-UnhelpfulPmdJsonFields -Path $reportPath
 }
 
 # Load captured stdout and stderr for post-analysis.
@@ -294,6 +370,19 @@ $syntacticValid = -not ($hadConfigErrors -or $hasConfigErrorText)
 # "valid" means the rule is syntactically correct and can be used.
 # "invalid" means the rule itself has configuration or compilation issues.
 $status = if ($syntacticValid) { "valid" } else { "invalid" }
+
+if ($Format -eq "json") {
+    Add-ScriptDetectedErrorsToJsonReport `
+        -Path $reportPath `
+        -HadConfigErrors $hadConfigErrors `
+        -ConfigErrorCount $configErrorCount `
+        -HadProcessingErrors $hadProcErrors `
+        -ProcessingErrorCountReport $processingErrorCountReport `
+        -ProcessingErrorCountStderr $processingErrorCountStderr `
+        -HadProcessingErrorsExitCode $hadProcErrorsExitCode `
+        -StdoutSnippet (Snip $stdout 1200) `
+        -StderrSnippet (Snip $stderr 1200)
+}
 
 [ordered]@{
     status                     = $status
