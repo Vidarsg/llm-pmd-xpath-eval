@@ -8,8 +8,10 @@
 #     -PmdBin "path\to\pmd.bat" `
 #     -Target "path\to\java\fileOrDir"
 #
+# Or pass a directory to process all .jsonl files under it recursively.
+#
 # Default output layout per run:
-#   .\out\evaluated-llm-rules_<input-name>_<timestamp>\
+#   .\out\evaluated-llm-rules\<input-name>_<timestamp>\
 #     results.jsonl
 #     reports\<ruleKey>.json
 
@@ -51,91 +53,145 @@ function Get-Timestamp() {
     return (Get-Date).ToString("yyyyMMdd-HHmmss")
 }
 
+function Get-InputLabel([string]$RootPath, [string]$FilePath) {
+    $rootItem = Get-Item $RootPath
+    $fileItem = Get-Item $FilePath
+
+    if ($rootItem.PSIsContainer) {
+        $relative = $fileItem.FullName.Substring($rootItem.FullName.Length).TrimStart('\', '/')
+        $relativeNoExt = [System.IO.Path]::ChangeExtension($relative, $null)
+        return ConvertTo-SafeFileName (($relativeNoExt -replace '[\\/]+', '_'))
+    }
+
+    return [System.IO.Path]::GetFileNameWithoutExtension($fileItem.Name)
+}
+
+function Invoke-ValidationRun(
+    [string]$InputJsonl,
+    [string]$RunOutDir,
+    [string]$RunOutJsonl,
+    [string]$RunReportsDir
+) {
+    New-Dir $RunOutDir
+
+    # Default results/report locations live under the run directory.
+    if (-not $RunOutJsonl) {
+        $RunOutJsonl = Join-Path $RunOutDir "results.jsonl"
+    }
+    if (-not $RunReportsDir) {
+        $RunReportsDir = Join-Path $RunOutDir "reports"
+    }
+
+    # Initialize output file (truncate if exists) so we always start fresh
+    "" | Set-Content -Path $RunOutJsonl -Encoding UTF8
+    # Ensure report output directory exists before processing
+    New-Dir $RunReportsDir
+
+    # Line counter used for fallback report names when ruleKey is missing
+    $idx = 0
+    # Stream input JSONL line-by-line to avoid loading whole file into memory
+    Get-Content -Path $InputJsonl -Encoding UTF8 | ForEach-Object {
+        $idx++
+        # Trim whitespace and skip empty lines to avoid JSON parse errors
+        $line = $_.Trim()
+        if (-not $line) { return }
+
+        # Parse JSON line into object with ruleKey + xpath
+        $rec = $line | ConvertFrom-Json
+        $ruleKey = $rec.ruleKey
+        $xpath = [string]$rec.xpath
+
+        # Base output row:
+        $row = [ordered]@{
+            ruleKey = $ruleKey
+            xpath   = $xpath
+        }
+
+        # Always pass a unique report path to avoid overwriting / empty shells
+        $safeKey = ConvertTo-SafeFileName ([string]$ruleKey)
+        if (-not $safeKey -or $safeKey -eq "null") { $safeKey = "rule-$idx" }
+        $outReport = Join-Path $RunReportsDir ($safeKey + ".json")
+
+        try {
+            # Execute PMD XPath check and capture its JSON output
+            $jsonOut = & $PmdXPathCheck `
+                -PmdBin $PmdBin `
+                -Target $Target `
+                -XPath $xpath `
+                -Format json `
+                -OutReport $outReport
+
+            # Parse JSON output from pmd-xpath-check.ps1
+            $pmd = $jsonOut | ConvertFrom-Json
+
+            # Merge PMD output fields into the output row
+            foreach ($p in $pmd.PSObject.Properties) {
+                $row[$p.Name] = $p.Value
+            }
+
+            # Always include the report path in the output row, even if PMD fails to generate a report (e.g. due to invalid XPath), so the caller can check for the presence of a report file as needed.
+            $row["reportPath"] = $outReport
+        }
+        catch {
+            # Record a crash so the caller can distinguish PMD errors from XPath results
+            $row["status"] = "validator_crash"
+            $row["error"] = $_.Exception.Message
+            $row["reportPath"] = $outReport
+        }
+
+        # Append the merged row as a single JSON line (JSONL format)
+        ($row | ConvertTo-Json -Depth 20 -Compress) | Add-Content -Path $RunOutJsonl -Encoding UTF8
+    }
+
+    Write-Host "Validation output written to:" -ForegroundColor Green
+    Write-Host ("  Input JSONL: {0}" -f (Resolve-Path $InputJsonl).Path) -ForegroundColor Green
+    Write-Host ("  Results JSONL: {0}" -f (Resolve-Path $RunOutJsonl).Path) -ForegroundColor Green
+    Write-Host ("  Per-rule reports: {0}" -f (Resolve-Path $RunReportsDir).Path) -ForegroundColor Green
+}
+
 if (-not (Test-Path $GeneratedJsonl)) { throw "GeneratedJsonl does not exist: $GeneratedJsonl" }
 if (-not (Test-Path $PmdXPathCheck)) { throw "PmdXPathCheck does not exist: $PmdXPathCheck" }
 if (-not (Test-Path $Target)) { throw "Target does not exist: $Target" }
 
-# Auto-generate a per-run output directory when one is not provided.
-if (-not $OutDir) {
-    $inputItem = Get-Item $GeneratedJsonl
-    $inputName = [System.IO.Path]::GetFileNameWithoutExtension($inputItem.Name)
-    $baseOut = Join-Path (Get-Location) "out"
-    $OutDir = Join-Path $baseOut ("evaluated-llm-rules_{0}_{1}" -f $inputName, (Get-Timestamp))
+$generatedItem = Get-Item $GeneratedJsonl
+$timestamp = Get-Timestamp
+$defaultBaseOutDir = Join-Path (Join-Path (Get-Location) "out") "evaluated-llm-rules"
+
+if ($generatedItem.PSIsContainer -and ($OutJsonl -or $ReportsDir)) {
+    throw "OutJsonl and ReportsDir can only be used when GeneratedJsonl points to a single file."
 }
 
-New-Dir $OutDir
-
-# Default results/report locations live under the run directory.
-if (-not $OutJsonl) {
-    $OutJsonl = Join-Path $OutDir "results.jsonl"
-}
-if (-not $ReportsDir) {
-    $ReportsDir = Join-Path $OutDir "reports"
+$inputFiles = if ($generatedItem.PSIsContainer) {
+    @(Get-ChildItem -Path $GeneratedJsonl -Recurse -Filter *.jsonl -File | Sort-Object FullName)
+} else {
+    @($generatedItem)
 }
 
-# Initialize output file (truncate if exists) so we always start fresh
-"" | Set-Content -Path $OutJsonl -Encoding UTF8
-# Ensure report output directory exists before processing
-New-Dir $ReportsDir
+if ($inputFiles.Count -eq 0) {
+    throw "No .jsonl files found under: $GeneratedJsonl"
+}
 
-# Line counter used for fallback report names when ruleKey is missing
-$idx = 0
-# Stream input JSONL line-by-line to avoid loading whole file into memory
-Get-Content -Path $GeneratedJsonl -Encoding UTF8 | ForEach-Object {
-    $idx++
-    # Trim whitespace and skip empty lines to avoid JSON parse errors
-    $line = $_.Trim()
-    if (-not $line) { return }
-
-    # Parse JSON line into object with ruleKey + xpath
-    $rec = $line | ConvertFrom-Json
-    $ruleKey = $rec.ruleKey
-    $xpath = [string]$rec.xpath
-
-    # Base output row:
-    $row = [ordered]@{
-        ruleKey = $ruleKey
-        xpath   = $xpath
-    }
-
-    # Always pass a unique report path to avoid overwriting / empty shells
-    $safeKey = ConvertTo-SafeFileName ([string]$ruleKey)
-    if (-not $safeKey -or $safeKey -eq "null") { $safeKey = "rule-$idx" }
-    $outReport = Join-Path $ReportsDir ($safeKey + ".json")
-
-    try {
-        # Execute PMD XPath check and capture its JSON output
-        $jsonOut = & $PmdXPathCheck `
-            -PmdBin $PmdBin `
-            -Target $Target `
-            -XPath $xpath `
-            -Format json `
-            -OutReport $outReport
-
-        # Parse JSON output from pmd-xpath-check.ps1
-        $pmd = $jsonOut | ConvertFrom-Json
-
-        # Merge PMD output fields into the output row
-        foreach ($p in $pmd.PSObject.Properties) {
-            $row[$p.Name] = $p.Value
+foreach ($inputFile in $inputFiles) {
+    $inputLabel = Get-InputLabel -RootPath $GeneratedJsonl -FilePath $inputFile.FullName
+    $runOutDir = if ($OutDir) {
+        if ($generatedItem.PSIsContainer) {
+            Join-Path $OutDir ("{0}_{1}" -f $inputLabel, $timestamp)
+        } else {
+            $OutDir
         }
-
-        # Always include the report path in the output row, even if PMD fails to generate a report (e.g. due to invalid XPath), so the caller can check for the presence of a report file as needed.
-        $row["reportPath"] = $outReport
-    }
-    catch {
-        # Record a crash so the caller can distinguish PMD errors from XPath results
-        $row["status"] = "validator_crash"
-        $row["error"] = $_.Exception.Message
-        $row["reportPath"] = $outReport
+    } else {
+        Join-Path $defaultBaseOutDir ("{0}_{1}" -f $inputLabel, $timestamp)
     }
 
-    # Append the merged row as a single JSON line (JSONL format)
-    ($row | ConvertTo-Json -Depth 20 -Compress) | Add-Content -Path $OutJsonl -Encoding UTF8
+    $runOutJsonl = if ($generatedItem.PSIsContainer) { "" } else { $OutJsonl }
+    $runReportsDir = if ($generatedItem.PSIsContainer) { "" } else { $ReportsDir }
+
+    Invoke-ValidationRun `
+        -InputJsonl $inputFile.FullName `
+        -RunOutDir $runOutDir `
+        -RunOutJsonl $runOutJsonl `
+        -RunReportsDir $runReportsDir
 }
 
-Write-Host "Validation output written to:" -ForegroundColor Green
-Write-Host ("  Results JSONL: {0}" -f (Resolve-Path $OutJsonl).Path) -ForegroundColor Green
-Write-Host ("  Per-rule reports: {0}" -f (Resolve-Path $ReportsDir).Path) -ForegroundColor Green
 $stopwatch.Stop()
 Write-Host ("  Runtime: {0:c}" -f $stopwatch.Elapsed) -ForegroundColor Green
