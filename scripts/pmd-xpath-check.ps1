@@ -164,6 +164,9 @@ function Add-ScriptDetectedErrorsToJsonReport(
 }
 
 # Validate the target upfront before passing to PMD.
+if (-not (Test-Path $PmdBin)) {
+    throw "PmdBin does not exist: $PmdBin"
+}
 if (-not (Test-Path $Target)) {
     throw "Target does not exist: $Target"
 }
@@ -367,6 +370,11 @@ if ($hasConfigErrorText -and $configErrorCount -eq 0) {
 # We distinguish between a rule being valid (well-formed XPath, proper XML) and the analysis being complete (target files parsed successfully).
 # A rule can be syntactically valid even if processing errors prevent full analysis.
 $syntacticValid = -not ($hadConfigErrors -or $hasConfigErrorText)
+
+# If PMD failed before producing any structured output, the rule was not actually validated.
+if ($Format -eq "json" -and -not (Test-Path $reportPath) -and $exitCode -ne 0) {
+    $syntacticValid = $false
+}
 
 # Final status: summarizes whether the rule passed validation.
 # "valid" means the rule is syntactically correct and can be used.
