@@ -167,7 +167,7 @@ $inputFiles = if ($generatedItem.PSIsContainer) {
     @($generatedItem)
 }
 
-if ($inputFiles.Count -eq 0) {
+if (@($inputFiles).Count -eq 0) {
     throw "No .jsonl files found under: $GeneratedJsonl"
 }
 

@@ -1,0 +1,34 @@
+{
+  "experimentName": "default-matrix",
+  "outputRoot": "out/experiments",
+  "generatorScript": "scripts/llm-xpath-generator.py",
+  "validatorScript": "scripts/validate-llm-generated-xpaths.ps1",
+  "runs": [
+    {
+      "name": "pmd-official-example-rules",
+      "inputRules": "config/example-rules.jsonl",
+      "targets": [
+        "java-classes"
+      ],
+      "models": [
+        {
+          "name": "openai/gpt-oss-120b",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        }
+      ],
+      "promptStyles": [
+        "zero-shot",
+        "few-shot",
+        "multi-step"
+      ],
+      "temperatures": [
+        0.0,
+        0.5,
+        1.0
+      ],
+      "runCount": 1,
+      "maxTokens": 2000
+    }
+  ]
+}
