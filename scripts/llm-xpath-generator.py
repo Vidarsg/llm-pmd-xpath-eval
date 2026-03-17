@@ -18,20 +18,17 @@ import requests
 ZERO_SHOT_TEMPLATE = """You are an expert in PMD 7.20 Java XPath rules.
 
 Task:
-Generate exactly one XPath expression for a PMD Java rule from the rule description below.
+Generate exactly one PMD Java XPath expression from the rule description below.
 
 Generation policy:
 - Prefer a conservative, syntactically valid XPath over an ambitious but fragile one.
-- Use the smallest AST pattern that captures the core violation.
 - If the exact AST structure is uncertain, simplify instead of guessing.
-- Avoid unsupported or speculative functions.
+- Prefer Java-specific XPath functions only when clearly useful.
 
 Hard requirements:
-- Perform the two steps internally, but do not print the steps.
 - Output exactly one XPath expression.
 - Output no explanation, no prose, no markdown, no XML, no rule wrapper.
 - Do not surround the answer with quotes or code fences.
-- The result must be a syntactically valid XPath expression intended for PMD Java AST matching.
 
 Rule description:
 {{RULE_DESCRIPTION}}
@@ -40,7 +37,7 @@ Rule description:
 FEW_SHOT_TEMPLATE = """You are an expert in PMD 7.20 Java XPath rules.
 
 Task:
-Generate exactly one XPath expression for a PMD Java rule from the rule description below.
+Generate exactly one PMD Java XPath expression from the rule description below.
 
 Learn the expected style from these official PMD examples.
 
@@ -84,16 +81,13 @@ XPath:
 
 Generation policy:
 - Prefer a conservative, syntactically valid XPath over an ambitious but fragile one.
-- Use the smallest AST pattern that captures the core violation.
 - If the exact AST structure is uncertain, simplify instead of guessing.
-- Avoid unsupported or speculative functions.
+- Prefer Java-specific XPath functions only when clearly useful.
 
 Hard requirements:
-- Perform the two steps internally, but do not print the steps.
 - Output exactly one XPath expression.
 - Output no explanation, no prose, no markdown, no XML, no rule wrapper.
 - Do not surround the answer with quotes or code fences.
-- The result must be a syntactically valid XPath expression intended for PMD Java AST matching.
 
 Rule description:
 {{RULE_DESCRIPTION}}
@@ -102,29 +96,35 @@ Rule description:
 MULTI_STEP_TEMPLATE = """You are generating a PMD 7.20 Java XPath expression.
 
 Task:
-Given a rule description, produce one syntactically valid XPath expression for PMD Java AST.
+Generate exactly one PMD Java XPath expression from the rule description below.
 
-Process to follow internally:
-1. Identify the smallest AST pattern that captures the rule.
-2. Build the XPath using only constructs that are common in PMD 7 Java rules.
-3. Check the XPath for syntax issues:
-   - balanced brackets and parentheses
-   - valid predicate structure
-   - exactly one XPath expression
-   - no prose, labels, or markdown
-4. If uncertain about an AST detail, simplify the expression instead of guessing.
+Follow this process internally:
 
-Allowed style:
-- Prefer patterns similar to official PMD rules.
-- Prefer pmd-java:typeIs / typeIsExactly / matchesSig only when clearly useful.
-- Prefer conservative validity over ambitious coverage.
+Step 1: AST verification planning
+Given the rule description, derive the minimal verification steps needed on a Java AST.
+For each step, identify:
+- which AST node or subtree should be inspected
+- what property, attribute, relationship, or type condition must hold
+- whether the step narrows the match or excludes false positives
+
+Step 2: XPath construction
+Translate those verification steps into one XPath expression.
+- Start from the narrowest stable AST anchor you can justify
+- Encode each verification step as a predicate, path constraint, or function call
+- Prefer patterns commonly used in official PMD Java XPath rules
+
+Step 3: Syntax self-check
+Before answering, verify that the XPath:
+- has balanced brackets and parentheses
+- contains valid predicates
+- is exactly one XPath expression
+- contains no prose, labels, markdown, code fences, or XML wrapper
 
 Hard requirements:
+- Perform the steps internally, but do not print the steps.
 - Output exactly one XPath expression.
-- No explanation.
-- No XML wrapper.
-- No code fences.
-- If unsure, output a simpler valid XPath rather than a complex uncertain one.
+- Output no explanation, no prose, no markdown, no XML, no rule wrapper.
+- Do not surround the answer with quotes or code fences.
 
 Rule description:
 {{RULE_DESCRIPTION}}
