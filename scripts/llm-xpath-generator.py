@@ -34,60 +34,126 @@ Rule description:
 {{RULE_DESCRIPTION}}
 """
 
-FEW_SHOT_TEMPLATE = """You are an expert in PMD 7.20 Java XPath rules.
+FEW_SHOT_TEMPLATE = """You are an expert PMD 7 Java XPath rule engineer.
 
 Task:
-Generate exactly one PMD Java XPath expression from the rule description below.
+Translate a natural-language Java rule description into exactly one valid PMD Java XPath expression.
 
-Learn the expected style from these official PMD examples.
+Technical context:
+- PMD version: 7.20
+- Target language: Java
+- XPath version: XPath 3.1 as used by PMD 7
+- PMD Java functions commonly used:
+  - pmd-java:typeIs('ClassName')
+  - pmd-java:typeIsExactly('ClassName')
+  - pmd-java:matchesSig('Signature')
+  - pmd-java:nodeIs('NodeName')
+  - pmd-java:hasAnnotation('AnnotationName')
+  - pmd-java:modifiers()
 
-Example 1
-Rule description:
-Avoid printStackTrace(); use a logger call instead.
-XPath:
-//MethodCall[ pmd-java:matchesSig("java.lang.Throwable#printStackTrace()") ]
-
-Example 2
-Rule description:
-StringBuffers/StringBuilders can grow considerably, and so may become a source of memory leaks if held within objects with long lifetimes.
-XPath:
-//FieldDeclaration/ClassType[pmd-java:typeIs('java.lang.StringBuffer') or pmd-java:typeIs('java.lang.StringBuilder')]
-
-Example 3
-Rule description:
-References to System.(out|err).print are usually intended for debugging purposes and can remain in the codebase even in production code.
-XPath:
-//MethodCall[ starts-with(@MethodName, 'print') ]
-  /FieldAccess[ @Name = ('err', 'out') ]
-  /TypeExpression[ pmd-java:typeIsExactly('java.lang.System') ]
-
-Example 4
-Rule description:
-Unused labeled are unnecessary and may be confusing as you might be wondering what this label is used for.
-XPath:
-//LabeledStatement[let $label := @Label return
-      not( (.//BreakStatement | .//ContinueStatement)[@Label = $label] )
-]
-
-Example 5
-Rule description:
-Java 5 introduced the varargs parameter declaration for methods and constructors. Byte arrays in any method and String arrays in public static void main(String[]) methods are ignored.
-XPath:
-//FormalParameters[not(parent::MethodDeclaration[@Overridden=true() or @MainMethod=true()])]
-  /FormalParameter[position()=last()]
-   [@Varargs=false()]
-   [ArrayType[not(PrimitiveType[@Kind = "byte"] or ClassType[pmd-java:typeIs('java.lang.Byte')])]
-    or VariableId[ArrayDimensions] and (PrimitiveType[not(@Kind="byte")] or ClassType[not(pmd-java:typeIs('java.lang.Byte'))])]
-
-Generation policy:
-- Prefer a conservative, syntactically valid XPath over an ambitious but fragile one.
-- If the exact AST structure is uncertain, simplify instead of guessing.
-- Prefer Java-specific XPath functions only when clearly useful.
+Generation procedure:
+1. Identify the main violating AST construct.
+2. Choose the narrowest stable AST node as the anchor.
+3. Add only the predicates needed to express the violation.
+4. If the rule requires type or signature reasoning, use PMD Java functions only when clearly justified.
+5. If uncertain about an AST detail, simplify instead of guessing.
 
 Hard requirements:
 - Output exactly one XPath expression.
-- Output no explanation, no prose, no markdown, no XML, no rule wrapper.
-- Do not surround the answer with quotes or code fences.
+- Output no explanation, no steps, no markdown, no XML wrapper, no comments.
+- Prefer a conservative valid XPath over an ambitious fragile XPath.
+- Do not invent PMD functions or AST node names.
+- Do not use unsupported syntax.
+
+Examples:
+Example 1
+Rule description:
+Methods such as `getDeclaredConstructors()`, `getDeclaredMethods()`, and `getDeclaredFields()` also return private constructors, methods and fields. These can be made accessible by calling `setAccessible(true)`. This gives access to normally protected data which violates the principle of encapsulation. This rule detects calls to `setAccessible` and finds possible accessibility alterations. If the call to `setAccessible` is wrapped within a `PrivilegedAction`, then the access alteration is assumed to be deliberate and is not reported. For future-proof code, deliberate access alteration should be suppressed using the usual suppression methods.
+XPath:
+//MethodCall[
+          pmd-java:matchesSig("java.lang.reflect.AccessibleObject#setAccessible(boolean)")
+       or pmd-java:matchesSig("_#setAccessible(java.lang.reflect.AccessibleObject[],boolean)")
+    ]
+    [not(ArgumentList/BooleanLiteral[@True = false()])]
+    [not(ancestor::ConstructorCall[1][pmd-java:typeIs('java.security.PrivilegedAction')]/AnonymousClassDeclaration)]
+    [not(ancestor::ClassDeclaration[1][pmd-java:typeIs('java.security.PrivilegedAction')])]
+    [not(ancestor::LambdaExpression[pmd-java:typeIs('java.security.PrivilegedAction')])]
+
+Example 2
+Rule description:
+Empty or auto-generated methods in an abstract class should be tagged as abstract. This helps to remove their inappropriate usage by developers who should be implementing their own versions in the concrete subclasses.
+XPath:
+//ClassDeclaration[@RegularClass = true() and pmd-java:modifiers() = "abstract"]
+  /ClassBody
+    /MethodDeclaration
+    [@Final = false()]
+    [Block[
+      let $size := count(*[not(self::EmptyStatement)])
+      return $size = 0
+             or $size = 1 and ReturnStatement[NullLiteral
+                                              or NumericLiteral[@ValueAsInt = 0]
+                                              or StringLiteral[@Empty = true()]]
+    ]]
+
+Example 3
+Rule description:
+The method name and parameter number are suspiciously close to `Object.equals`, which can denote an intention to override it. However, the method does not override `Object.equals`, but overloads it instead.
+XPath:
+//MethodDeclaration[@Name = 'equals'][
+    (@Arity = 1
+     and not(FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')])
+     or not(PrimitiveType[@Kind = 'boolean'])
+    ) or (
+     @Arity = 2
+     and PrimitiveType[@Kind = 'boolean']
+     and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]
+     and not(pmd-java:hasAnnotation('java.lang.Override'))
+    )
+]
+| //MethodDeclaration[@Name = 'equal'][
+    @Arity = 1
+    and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]
+]
+
+Example 4
+Rule description:
+This rule detects methods called `setUp()` that are not properly annotated as a setup method. This is primarily intended to assist in upgrading from JUnit 3, where setup methods were required to be called `setUp()`.
+XPath:
+//MethodDeclaration[@Name='setUp' and @Arity=0]
+    [not(ModifierList/Annotation[
+           pmd-java:typeIs('org.junit.Before')
+        or pmd-java:typeIs('org.junit.jupiter.api.BeforeEach')
+        or pmd-java:typeIs('org.junit.jupiter.api.BeforeAll')
+        or pmd-java:typeIs('org.testng.annotations.BeforeMethod')
+        or pmd-java:typeIs('org.testng.annotations.BeforeClass')
+    ])]
+    [../MethodDeclaration[
+               pmd-java:hasAnnotation('org.junit.Test')
+            or pmd-java:hasAnnotation('org.junit.jupiter.api.Test')
+            or pmd-java:hasAnnotation('org.testng.annotations.Test')
+    ]]
+
+Example 5
+Rule description:
+A JUnit test assertion with a boolean literal is unnecessary since it always will evaluate to the same thing. Consider using flow control or simply removing statements like `assertTrue(true)` and `assertFalse(false)`.
+XPath:
+//ClassDeclaration
+    [pmd-java:typeIs('junit.framework.TestCase')
+     or .//Annotation[pmd-java:typeIs('org.junit.Test')
+                   or pmd-java:typeIs('org.junit.jupiter.api.Test')
+                   or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')
+                   or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')
+                   or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')
+                   or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')
+     ]
+    ]
+    //MethodCall[@MethodName = ('assertTrue', 'assertFalse')]
+        [ArgumentList
+            [
+                BooleanLiteral or
+                UnaryExpression[@Operator = '!'][BooleanLiteral]
+            ]
+        ]
 
 Rule description:
 {{RULE_DESCRIPTION}}
