@@ -10,6 +10,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 import time
 
@@ -19,25 +20,6 @@ ZERO_SHOT_TEMPLATE = """You are an expert in PMD 7.20 Java XPath rules.
 
 Task:
 Generate exactly one PMD Java XPath expression from the rule description below.
-
-Generation policy:
-- Prefer a conservative, syntactically valid XPath over an ambitious but fragile one.
-- If the exact AST structure is uncertain, simplify instead of guessing.
-- Prefer Java-specific XPath functions only when clearly useful.
-
-Hard requirements:
-- Output exactly one XPath expression.
-- Output no explanation, no prose, no markdown, no XML, no rule wrapper.
-- Do not surround the answer with quotes or code fences.
-
-Rule description:
-{{RULE_DESCRIPTION}}
-"""
-
-FEW_SHOT_TEMPLATE = """You are an expert PMD 7 Java XPath rule engineer.
-
-Task:
-Translate a natural-language Java rule description into exactly one valid PMD Java XPath expression.
 
 Technical context:
 - PMD version: 7.20
@@ -59,101 +41,49 @@ Generation procedure:
 5. If uncertain about an AST detail, simplify instead of guessing.
 
 Hard requirements:
-- Output exactly one XPath expression.
-- Output no explanation, no steps, no markdown, no XML wrapper, no comments.
 - Prefer a conservative valid XPath over an ambitious fragile XPath.
 - Do not invent PMD functions or AST node names.
 - Do not use unsupported syntax.
+- Output no explanation, no steps, no markdown, no XML wrapper, no comments.
+- Return exactly one raw XPath expression and nothing else.
+
+Rule description:
+{{RULE_DESCRIPTION}}
+"""
+
+FEW_SHOT_TEMPLATE = """You are an expert in PMD 7.20 Java XPath rules.
+
+Task:
+Generate exactly one PMD Java XPath expression from the rule description below.
+
+Technical context:
+- PMD version: 7.20
+- Target language: Java
+- XPath version: XPath 3.1 as used by PMD 7
+- PMD Java functions commonly used:
+  - pmd-java:typeIs('ClassName')
+  - pmd-java:typeIsExactly('ClassName')
+  - pmd-java:matchesSig('Signature')
+  - pmd-java:nodeIs('NodeName')
+  - pmd-java:hasAnnotation('AnnotationName')
+  - pmd-java:modifiers()
+
+Generation procedure:
+1. Identify the main violating AST construct.
+2. Choose the narrowest stable AST node as the anchor.
+3. Add only the predicates needed to express the violation.
+4. If the rule requires type or signature reasoning, use PMD Java functions only when clearly justified.
+5. If uncertain about an AST detail, simplify instead of guessing.
+
+Hard requirements:
+- Prefer a conservative valid XPath over an ambitious fragile XPath.
+- Do not invent PMD functions or AST node names.
+- Do not use unsupported syntax.
+- Output no explanation, no steps, no markdown, no XML wrapper, no comments.
+- Return exactly one raw XPath expression and nothing else.
 
 Examples:
-Example 1
-Rule description:
-Methods such as `getDeclaredConstructors()`, `getDeclaredMethods()`, and `getDeclaredFields()` also return private constructors, methods and fields. These can be made accessible by calling `setAccessible(true)`. This gives access to normally protected data which violates the principle of encapsulation. This rule detects calls to `setAccessible` and finds possible accessibility alterations. If the call to `setAccessible` is wrapped within a `PrivilegedAction`, then the access alteration is assumed to be deliberate and is not reported. For future-proof code, deliberate access alteration should be suppressed using the usual suppression methods.
-XPath:
-//MethodCall[
-          pmd-java:matchesSig("java.lang.reflect.AccessibleObject#setAccessible(boolean)")
-       or pmd-java:matchesSig("_#setAccessible(java.lang.reflect.AccessibleObject[],boolean)")
-    ]
-    [not(ArgumentList/BooleanLiteral[@True = false()])]
-    [not(ancestor::ConstructorCall[1][pmd-java:typeIs('java.security.PrivilegedAction')]/AnonymousClassDeclaration)]
-    [not(ancestor::ClassDeclaration[1][pmd-java:typeIs('java.security.PrivilegedAction')])]
-    [not(ancestor::LambdaExpression[pmd-java:typeIs('java.security.PrivilegedAction')])]
-
-Example 2
-Rule description:
-Empty or auto-generated methods in an abstract class should be tagged as abstract. This helps to remove their inappropriate usage by developers who should be implementing their own versions in the concrete subclasses.
-XPath:
-//ClassDeclaration[@RegularClass = true() and pmd-java:modifiers() = "abstract"]
-  /ClassBody
-    /MethodDeclaration
-    [@Final = false()]
-    [Block[
-      let $size := count(*[not(self::EmptyStatement)])
-      return $size = 0
-             or $size = 1 and ReturnStatement[NullLiteral
-                                              or NumericLiteral[@ValueAsInt = 0]
-                                              or StringLiteral[@Empty = true()]]
-    ]]
-
-Example 3
-Rule description:
-The method name and parameter number are suspiciously close to `Object.equals`, which can denote an intention to override it. However, the method does not override `Object.equals`, but overloads it instead.
-XPath:
-//MethodDeclaration[@Name = 'equals'][
-    (@Arity = 1
-     and not(FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')])
-     or not(PrimitiveType[@Kind = 'boolean'])
-    ) or (
-     @Arity = 2
-     and PrimitiveType[@Kind = 'boolean']
-     and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]
-     and not(pmd-java:hasAnnotation('java.lang.Override'))
-    )
-]
-| //MethodDeclaration[@Name = 'equal'][
-    @Arity = 1
-    and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]
-]
-
-Example 4
-Rule description:
-This rule detects methods called `setUp()` that are not properly annotated as a setup method. This is primarily intended to assist in upgrading from JUnit 3, where setup methods were required to be called `setUp()`.
-XPath:
-//MethodDeclaration[@Name='setUp' and @Arity=0]
-    [not(ModifierList/Annotation[
-           pmd-java:typeIs('org.junit.Before')
-        or pmd-java:typeIs('org.junit.jupiter.api.BeforeEach')
-        or pmd-java:typeIs('org.junit.jupiter.api.BeforeAll')
-        or pmd-java:typeIs('org.testng.annotations.BeforeMethod')
-        or pmd-java:typeIs('org.testng.annotations.BeforeClass')
-    ])]
-    [../MethodDeclaration[
-               pmd-java:hasAnnotation('org.junit.Test')
-            or pmd-java:hasAnnotation('org.junit.jupiter.api.Test')
-            or pmd-java:hasAnnotation('org.testng.annotations.Test')
-    ]]
-
-Example 5
-Rule description:
-A JUnit test assertion with a boolean literal is unnecessary since it always will evaluate to the same thing. Consider using flow control or simply removing statements like `assertTrue(true)` and `assertFalse(false)`.
-XPath:
-//ClassDeclaration
-    [pmd-java:typeIs('junit.framework.TestCase')
-     or .//Annotation[pmd-java:typeIs('org.junit.Test')
-                   or pmd-java:typeIs('org.junit.jupiter.api.Test')
-                   or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')
-                   or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')
-                   or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')
-                   or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')
-     ]
-    ]
-    //MethodCall[@MethodName = ('assertTrue', 'assertFalse')]
-        [ArgumentList
-            [
-                BooleanLiteral or
-                UnaryExpression[@Operator = '!'][BooleanLiteral]
-            ]
-        ]
+{{RETRIEVED_EXAMPLES}}
 
 Rule description:
 {{RULE_DESCRIPTION}}
@@ -187,10 +117,11 @@ Before answering, verify that the XPath:
 - contains no prose, labels, markdown, code fences, or XML wrapper
 
 Hard requirements:
-- Perform the steps internally, but do not print the steps.
-- Output exactly one XPath expression.
-- Output no explanation, no prose, no markdown, no XML, no rule wrapper.
-- Do not surround the answer with quotes or code fences.
+- Prefer a conservative valid XPath over an ambitious fragile XPath.
+- Do not invent PMD functions or AST node names.
+- Do not use unsupported syntax.
+- Output no explanation, no steps, no markdown, no XML wrapper, no comments.
+- Return exactly one raw XPath expression and nothing else.
 
 Rule description:
 {{RULE_DESCRIPTION}}
@@ -201,6 +132,156 @@ PROMPT_TEMPLATES = {
     "few-shot": FEW_SHOT_TEMPLATE,
     "multi-step": MULTI_STEP_TEMPLATE,
 }
+
+STOP_WORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "if", "in",
+    "into", "is", "it", "its", "no", "not", "of", "on", "or", "that", "the",
+    "their", "then", "this", "to", "use", "used", "using", "when", "where",
+    "which", "with", "without",
+}
+
+
+def tokenize_description(text: str) -> set[str]:
+    """Tokenize rule descriptions for simple retrieval scoring."""
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_.#-]*", text.lower())
+    return {token for token in tokens if token not in STOP_WORDS and len(token) > 2}
+
+
+def load_catalog_examples(catalog_path: str) -> list[dict]:
+    """Load PMD catalog rules with description/xpath pairs usable as few-shot examples."""
+    with open(catalog_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    rules = []
+    for rule_id, rule in (data.get("rules") or {}).items():
+        description = (rule.get("description") or "").strip()
+        xpath = (rule.get("xpath") or "").strip()
+        if not description or not xpath:
+            continue
+
+        rules.append({
+            "id": rule.get("id") or rule_id,
+            "description": description,
+            "xpath": xpath,
+            "tokens": tokenize_description(description),
+        })
+
+    return rules
+
+
+def score_example(query_tokens: set[str], example_tokens: set[str]) -> tuple[int, int]:
+    """Rank examples by token overlap and then by example specificity."""
+    overlap = len(query_tokens & example_tokens)
+    return overlap, len(example_tokens)
+
+
+def select_retrieved_examples(description: str, catalog_rules: list[dict], limit: int, excluded_ids: set[str] | None = None) -> list[dict]:
+    """Pick the closest catalog examples for the current rule description."""
+    query_tokens = tokenize_description(description)
+    excluded_ids = excluded_ids or set()
+    ranked = sorted(
+        catalog_rules,
+        key=lambda rule: score_example(query_tokens, rule["tokens"]),
+        reverse=True,
+    )
+
+    selected = []
+    for rule in ranked:
+        if str(rule["id"]).strip() in excluded_ids:
+            continue
+        if rule["description"].strip() == description.strip():
+            continue
+        if score_example(query_tokens, rule["tokens"])[0] == 0 and selected:
+            break
+        selected.append(rule)
+        if len(selected) >= limit:
+            break
+
+    if selected:
+        return selected
+
+    return ranked[:limit]
+
+
+def format_retrieved_examples(examples: list[dict]) -> str:
+    """Render retrieved PMD rules into the few-shot prompt block."""
+    parts = []
+    for index, example in enumerate(examples, start=1):
+        parts.append(
+            f"Example {index}\n"
+            f"Rule description:\n{example['description']}\n"
+            f"XPath:\n{example['xpath']}"
+        )
+    return "\n\n".join(parts)
+
+
+def resolve_api_format(base_url: str, model: str, api_format: str) -> str:
+    """Use the Responses API by default for OpenAI GPT-5 family models."""
+    if api_format != "auto":
+        return api_format
+
+    if "api.openai.com" in base_url.rstrip("/").lower() and model.lower().startswith("gpt-5"):
+        return "responses"
+
+    return "chat"
+
+
+def build_request(api_format: str, args, prompt: str) -> tuple[str, dict]:
+    """Build the endpoint path and payload for the selected API shape."""
+    if api_format == "responses":
+        payload = {
+            "model": args.model,
+            "input": prompt,
+            "max_output_tokens": args.max_tokens,
+        }
+        if args.temperature is not None:
+            payload["temperature"] = args.temperature
+        if args.reasoning_effort:
+            payload["reasoning"] = {"effort": args.reasoning_effort}
+        if args.verbosity:
+            payload["text"] = {"format": {"type": "text"},
+                               "verbosity": args.verbosity}
+        return "/v1/responses", payload
+
+    payload = {
+        "model": args.model,
+        "max_tokens": args.max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if args.temperature is not None:
+        payload["temperature"] = args.temperature
+    return "/v1/chat/completions", payload
+
+
+def extract_content(api_format: str, data: dict) -> str | None:
+    """Extract text from either Responses API or Chat Completions API output."""
+    if api_format == "responses":
+        output_text = data.get("output_text")
+        if output_text:
+            return output_text
+
+        for item in data.get("output", []):
+            for content in item.get("content", []):
+                text = content.get("text")
+                if text:
+                    return text
+        return None
+
+    choice = data.get("choices", [{}])[0]
+    msg = choice.get("message") or {}
+    content = msg.get("content")
+
+    if content is None:
+        content = msg.get("reasoning_content")
+
+    if content is None:
+        content = choice.get("text")
+
+    if content is None:
+        psf = msg.get("provider_specific_fields") or {}
+        content = psf.get("reasoning_content") or psf.get("reasoning")
+
+    return content
 
 
 def resolve_output_path(output_file: str, prompt_style: str) -> str:
@@ -231,13 +312,27 @@ def main() -> int:
     ap.add_argument("--max-tokens", type=int, default=1500,
                     help="Maximum tokens in response")
     ap.add_argument("--temperature", type=float, default=0.7,
-                    help="Sampling temperature (0=deterministic)")
+                    help="Sampling temperature (omit for models/endpoints that reject it)")
+    ap.add_argument("--api-format", choices=("auto", "chat", "responses"), default="auto",
+                    help="API payload shape; auto uses Responses API for OpenAI GPT-5 models")
+    ap.add_argument("--reasoning-effort", choices=("none", "minimal", "low", "medium", "high"), default="",
+                    help="Responses API only: reasoning effort level")
+    ap.add_argument("--verbosity", choices=("low", "medium", "high"), default="",
+                    help="Responses API only: text verbosity level")
+    ap.add_argument("--omit-temperature", action="store_true",
+                    help="Do not send the temperature parameter")
     ap.add_argument("--prompt-style", choices=sorted(PROMPT_TEMPLATES.keys()), default="zero-shot",
                     help="Prompt template style to use")
+    ap.add_argument("--catalog-path", default="config/pmd-catalog.json",
+                    help="PMD catalog JSON used to retrieve dynamic few-shot examples")
+    ap.add_argument("--few-shot-count", type=int, default=5,
+                    help="Number of retrieved few-shot examples to inject for few-shot prompting")
     ap.add_argument("--api-key", default="API_KEY",
                     help="Environment variable name containing API key")
     args = ap.parse_args()
     args.output_file = resolve_output_path(args.output_file, args.prompt_style)
+    if args.omit_temperature:
+        args.temperature = None
 
     # Retrieve API key from environment variable
     api_key = os.getenv(args.api_key)
@@ -246,11 +341,12 @@ def main() -> int:
             f"Missing API key {args.api_key}", file=sys.stderr)
         return 2
 
-    # Construct the OpenAI-compatible API endpoint URL and authentication headers
-    url = args.base_url.rstrip("/") + "/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}",
                "Content-Type": "application/json"}
     os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
+    catalog_rules = []
+    if args.prompt_style == "few-shot":
+        catalog_rules = load_catalog_examples(args.catalog_path)
 
     # Open input and output files
     # Process each line of the input JSONL file (one rule per line)
@@ -264,40 +360,44 @@ def main() -> int:
             rec = json.loads(line)
             rule_key = rec.get("ruleKey")
             desc = (rec.get("description") or "").strip()
+            excluded_ids = {
+                str(value).strip()
+                for value in (
+                    rec.get("catalogId"),
+                    rec.get("ruleId"),
+                    rec.get("id"),
+                    rule_key,
+                )
+                if value is not None and str(value).strip()
+            }
 
             # Build the prompt by substituting the rule description into the template
             prompt_template = PROMPT_TEMPLATES[args.prompt_style]
             prompt = prompt_template.replace("{{RULE_DESCRIPTION}}", desc)
+            if args.prompt_style == "few-shot":
+                retrieved_examples = select_retrieved_examples(
+                    desc, catalog_rules, args.few_shot_count, excluded_ids)
+                prompt = prompt.replace(
+                    "{{RETRIEVED_EXAMPLES}}",
+                    format_retrieved_examples(retrieved_examples),
+                )
 
-            # Construct the API request payload with model parameters
-            payload = {
-                "model": args.model,
-                "temperature": args.temperature,
-                "max_tokens": args.max_tokens,
-                "messages": [{"role": "user", "content": prompt}],
-            }
+            api_format = resolve_api_format(
+                args.base_url, args.model, args.api_format)
+            endpoint_path, payload = build_request(api_format, args, prompt)
+            url = args.base_url.rstrip("/") + endpoint_path
 
             # Send the request to the LLM API
             r = requests.post(url, headers=headers, json=payload, timeout=120)
-            r.raise_for_status()  # Raise exception on HTTP error
+            if not r.ok:
+                print(
+                    f"HTTP {r.status_code} for ruleKey = {rule_key}", file=sys.stderr)
+                print(r.text, file=sys.stderr)
+                r.raise_for_status()
 
             # Extract the generated text from the API response
             data = r.json()
-            choice = data.get("choices", [{}])[0]
-            msg = choice.get("message") or {}
-            content = msg.get("content")
-
-            # The gateway returns the text here when content is null
-            if content is None:
-                content = msg.get("reasoning_content")
-
-            # Fallbacks for other OpenAI-compatible shapes
-            if content is None:
-                content = choice.get("text")
-
-            if content is None:
-                psf = msg.get("provider_specific_fields") or {}
-                content = psf.get("reasoning_content") or psf.get("reasoning")
+            content = extract_content(api_format, data)
 
             if content is None:
                 print("WARNING: No content returned for ruleKey =",

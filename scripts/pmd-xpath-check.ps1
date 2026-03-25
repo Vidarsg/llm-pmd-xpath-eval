@@ -371,6 +371,12 @@ if ($hasConfigErrorText -and $configErrorCount -eq 0) {
 # A rule can be syntactically valid even if processing errors prevent full analysis.
 $syntacticValid = -not ($hadConfigErrors -or $hasConfigErrorText)
 
+# A violation count is only trustworthy when PMD completed without configuration or processing errors.
+# If either error category occurred, null out the count so downstream evaluation does not treat "0" as a clean no-match result.
+if ($hadConfigErrors -or $hadProcErrors) {
+    $violationCount = $null
+}
+
 # If PMD failed before producing any structured output, the rule was not actually validated.
 if ($Format -eq "json" -and -not (Test-Path $reportPath) -and $exitCode -ne 0) {
     $syntacticValid = $false
