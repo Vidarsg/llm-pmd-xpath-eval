@@ -104,7 +104,7 @@ def main() -> int:
                         help="Re-run stages even if outputs already exist")
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = Path(__file__).resolve().parent.parent.parent
     config_path = (repo_root / args.config).resolve()
     pmd_bin = (repo_root / args.pmd_bin).resolve()
 
@@ -113,9 +113,9 @@ def main() -> int:
                    "out/experiments")).resolve()
     experiment_root = output_root / sanitize(config["experimentName"])
     generator_script = (repo_root / config.get("generatorScript",
-                        "scripts/llm-xpath-generator.py")).resolve()
+                        "scripts/generation/llm-xpath-generator.py")).resolve()
     validator_script = (repo_root / config.get("validatorScript",
-                        "scripts/validate-llm-generated-xpaths.ps1")).resolve()
+                        "scripts/pmd/validate-llm-generated-xpaths.ps1")).resolve()
 
     ensure_dir(experiment_root)
     specs = build_run_specs(config)
@@ -202,7 +202,7 @@ def main() -> int:
                     "-GeneratedJsonl",
                     str(generated_jsonl),
                     "-PmdXPathCheck",
-                    str((repo_root / "scripts/pmd-xpath-check.ps1").resolve()),
+                    str((repo_root / "scripts/pmd/pmd-xpath-check.ps1").resolve()),
                     "-PmdBin",
                     str(pmd_bin),
                     "-Target",

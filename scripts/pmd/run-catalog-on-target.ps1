@@ -31,7 +31,7 @@ USEFUL FEATURES:
 
 EXAMPLE USAGE:
   # All rules, full repo
-  .\scripts\run-catalog-on-target.ps1 `
+  .\scripts\pmd\run-catalog-on-target.ps1 `
     -PmdBin "path\to\pmd.bat" `
     -RepoPath "path\to\target\repo" `
 #>
@@ -42,7 +42,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$RepoPath,
     [string]$CatalogPath = ".\config\pmd-catalog.json",
-    [string]$XPathCheckScript = ".\scripts\pmd-xpath-check.ps1",
+    [string]$XPathCheckScript = (Join-Path $PSScriptRoot "pmd-xpath-check.ps1"),
     [string]$OutDir = "",
     [ValidateSet("json")]
     [string]$Format = "json",

@@ -16,7 +16,7 @@ OPTIONAL FIELDS:
   - description, message, category, ref, sourceFiles
 
 EXAMPLE USAGE:
-  .\scripts\run-custom-rules-on-target.ps1 `
+  .\scripts\pmd\run-custom-rules-on-target.ps1 `
     -PmdBin "path\to\pmd.bat" `
     -RepoPath "path\to\target\repo" `
     -RulesPath "path\to\rules.jsonl"
@@ -29,7 +29,7 @@ param(
     [string]$RepoPath,
     [Parameter(Mandatory = $true)]
     [string]$RulesPath,
-    [string]$XPathCheckScript = ".\scripts\pmd-xpath-check.ps1",
+    [string]$XPathCheckScript = (Join-Path $PSScriptRoot "pmd-xpath-check.ps1"),
     [string]$OutDir = "",
     [ValidateSet("json")]
     [string]$Format = "json",

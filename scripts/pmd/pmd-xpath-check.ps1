@@ -2,7 +2,7 @@
 pmd-xpath-check.ps1
 
 Example:
-  .\scripts\pmd-xpath-check.ps1 `
+  .\scripts\pmd\pmd-xpath-check.ps1 `
     -PmdBin "path\to\pmd.bat" `
     -Target "path\to\java\fileOrDir" `
     -XPath "//Some/Expression" `

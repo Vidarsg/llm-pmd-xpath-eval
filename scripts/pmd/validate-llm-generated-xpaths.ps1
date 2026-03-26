@@ -2,9 +2,9 @@
 # Reads llm-generated-xpaths and runs pmd-xpath-check.ps1 for each xpath expression.
 #
 # Usage:
-#   .\scripts\validate-llm-generated-xpaths.ps1 `
+#   .\scripts\pmd\validate-llm-generated-xpaths.ps1 `
 #     -GeneratedJsonl path\to\llm-generated-xpaths.jsonl `
-#     -PmdXPathCheck .\scripts\pmd-xpath-check.ps1 `
+#     -PmdXPathCheck .\scripts\pmd\pmd-xpath-check.ps1 `
 #     -PmdBin "path\to\pmd.bat" `
 #     -Target "path\to\java\fileOrDir"
 #

@@ -4,7 +4,7 @@
 #
 # Usage:
 #   set API_KEY=<personal api key>
-#   python .\scripts\llm-xpath-generator.py --in <input JSONL file location> --out <output JSONL file location>
+#   python .\scripts\generation\llm-xpath-generator.py --in <input JSONL file location> --out <output JSONL file location>
 #     --base-url <LLM API base URL> --model <model identifier> --max-tokens <maximum tokens in response> --temperature <sampling temperature>
 
 import argparse

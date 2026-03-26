@@ -1,6 +1,6 @@
 # This script validates the syntactical validity of XPath expressions from the official PMD catalog by running them against a single test file, returning a csv summary of the results.
 # It does not attempt to run the rules on a full codebase or interpret the results beyond basic error detection.
-# For a more comprehensive validation that runs the rules on a full codebase and collects detailed results, use run-catalog-on-target.ps1 instead.
+# For a more comprehensive validation that runs the rules on a full codebase and collects detailed results, use scripts\pmd\run-catalog-on-target.ps1 instead.
 
 $catalog = Get-Content ".\config\pmd-catalog.json" -Raw | ConvertFrom-Json
 $testFile = "path\to\test\file\Example.java"  # Change to an actual Java file for testing
@@ -19,7 +19,8 @@ foreach ($prop in $catalog.rules.PSObject.Properties) {
 
     Write-Host "Testing rule:" $r.id
 
-    $resJson = & .\scripts\pmd-xpath-check.ps1 `
+    $xpathCheckScript = Join-Path $PSScriptRoot "..\pmd\pmd-xpath-check.ps1"
+    $resJson = & $xpathCheckScript `
         -PmdBin $pmdBin `
         -Target $testFile `
         -XPath $r.xpath

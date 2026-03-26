@@ -1,14 +1,14 @@
 {
-  "experimentName": "default-matrix",
+  "experimentName": "test-run",
   "outputRoot": "out/experiments",
-  "generatorScript": "scripts/llm-xpath-generator.py",
-  "validatorScript": "scripts/validate-llm-generated-xpaths.ps1",
+  "generatorScript": "scripts/generation/llm-xpath-generator.py",
+  "validatorScript": "scripts/pmd/validate-llm-generated-xpaths.ps1",
   "runs": [
     {
-      "name": "pmd-official-example-rules",
-      "inputRules": "config/example-rules.jsonl",
+      "name": "official-pmd-rules-on-commons-lang",
+      "inputRules": "config/pmd-official-rule-descriptions.jsonl",
       "targets": [
-        "java-classes"
+        "C:/users/vidar/desktop/commons-lang/src"
       ],
       "models": [
         {
@@ -18,16 +18,12 @@
         }
       ],
       "promptStyles": [
-        "zero-shot",
-        "few-shot",
-        "multi-step"
+        "zero-shot"
       ],
       "temperatures": [
-        0.0,
-        0.5,
-        1.0
+        0.7
       ],
-      "runCount": 1,
+      "runCount": 2,
       "maxTokens": 2000
     }
   ]
