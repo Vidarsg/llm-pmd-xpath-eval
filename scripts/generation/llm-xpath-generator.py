@@ -147,8 +147,55 @@ def tokenize_description(text: str) -> set[str]:
     return {token for token in tokens if token not in STOP_WORDS and len(token) > 2}
 
 
+def load_jsonl_records(path: str) -> list[dict]:
+    """Load non-empty JSONL records from disk."""
+    records = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            records.append(json.loads(line))
+    return records
+
+
 def load_catalog_examples(catalog_path: str) -> list[dict]:
-    """Load PMD catalog rules with description/xpath pairs usable as few-shot examples."""
+    """Load PMD examples with description/xpath pairs usable as few-shot examples."""
+    if catalog_path.lower().endswith(".jsonl"):
+        descriptions = load_jsonl_records(catalog_path)
+        xpaths_path = re.sub(r"rule-descriptions\.jsonl$", "rule-xpaths.jsonl", catalog_path)
+        if xpaths_path == catalog_path or not os.path.exists(xpaths_path):
+            raise FileNotFoundError(
+                f"Could not infer matching XPath JSONL file for few-shot examples from {catalog_path}"
+            )
+
+        xpaths_by_key = {
+            str(rec.get("ruleKey")).strip(): rec
+            for rec in load_jsonl_records(xpaths_path)
+            if rec.get("ruleKey") is not None and str(rec.get("ruleKey")).strip()
+        }
+
+        rules = []
+        for rec in descriptions:
+            rule_key = rec.get("ruleKey")
+            description = (rec.get("description") or "").strip()
+            if rule_key is None or not description:
+                continue
+
+            xpath_rec = xpaths_by_key.get(str(rule_key).strip())
+            xpath = ((xpath_rec or {}).get("xpath") or "").strip()
+            if not xpath:
+                continue
+
+            rules.append({
+                "id": str(rule_key).strip(),
+                "catalogId": (xpath_rec or {}).get("catalogId"),
+                "description": description,
+                "xpath": xpath,
+                "tokens": tokenize_description(description),
+            })
+        return rules
+
     with open(catalog_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -161,6 +208,7 @@ def load_catalog_examples(catalog_path: str) -> list[dict]:
 
         rules.append({
             "id": rule.get("id") or rule_id,
+            "catalogId": rule.get("id") or rule_id,
             "description": description,
             "xpath": xpath,
             "tokens": tokenize_description(description),
@@ -207,8 +255,10 @@ def format_retrieved_examples(examples: list[dict]) -> str:
     """Render retrieved PMD rules into the few-shot prompt block."""
     parts = []
     for index, example in enumerate(examples, start=1):
+        example_id = example.get("catalogId") or example.get("id")
         parts.append(
             f"Example {index}\n"
+            f"Rule id:\n{example_id}\n"
             f"Rule description:\n{example['description']}\n"
             f"XPath:\n{example['xpath']}"
         )
@@ -323,8 +373,8 @@ def main() -> int:
                     help="Do not send the temperature parameter")
     ap.add_argument("--prompt-style", choices=sorted(PROMPT_TEMPLATES.keys()), default="zero-shot",
                     help="Prompt template style to use")
-    ap.add_argument("--catalog-path", default="config/pmd-catalog.json",
-                    help="PMD catalog JSON used to retrieve dynamic few-shot examples")
+    ap.add_argument("--catalog-path", default="config/pmd-official-rule-descriptions.jsonl",
+                    help="PMD example source used to retrieve dynamic few-shot examples; accepts the cleaned descriptions JSONL or the full catalog JSON")
     ap.add_argument("--few-shot-count", type=int, default=5,
                     help="Number of retrieved few-shot examples to inject for few-shot prompting")
     ap.add_argument("--api-key", default="API_KEY",
@@ -377,6 +427,13 @@ def main() -> int:
             if args.prompt_style == "few-shot":
                 retrieved_examples = select_retrieved_examples(
                     desc, catalog_rules, args.few_shot_count, excluded_ids)
+                example_labels = [
+                    str(example.get("catalogId") or example.get("id") or "<missing-id>")
+                    for example in retrieved_examples
+                ]
+                print(
+                    f"few-shot examples for ruleKey={rule_key}: {', '.join(example_labels)}"
+                )
                 prompt = prompt.replace(
                     "{{RETRIEVED_EXAMPLES}}",
                     format_retrieved_examples(retrieved_examples),
@@ -388,7 +445,7 @@ def main() -> int:
             url = args.base_url.rstrip("/") + endpoint_path
 
             # Send the request to the LLM API
-            r = requests.post(url, headers=headers, json=payload, timeout=120)
+            r = requests.post(url, headers=headers, json=payload, timeout=300)
             if not r.ok:
                 print(
                     f"HTTP {r.status_code} for ruleKey = {rule_key}", file=sys.stderr)

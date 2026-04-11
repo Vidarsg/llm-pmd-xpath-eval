@@ -34,6 +34,8 @@ EXAMPLE USAGE:
   .\scripts\pmd\run-catalog-on-target.ps1 `
     -PmdBin "path\to\pmd.bat" `
     -RepoPath "path\to\target\repo" `
+    -CatalogPath "path\to\pmd-catalog.json" `
+    -XPathCheckScript "path\to\pmd-xpath-check.ps1" `
 #>
 
 param(
@@ -41,7 +43,9 @@ param(
     [string]$PmdBin,
     [Parameter(Mandatory = $true)]
     [string]$RepoPath,
+    [Parameter(Mandatory = $true)]
     [string]$CatalogPath = ".\config\pmd-catalog.json",
+    [Parameter(Mandatory = $true)]
     [string]$XPathCheckScript = (Join-Path $PSScriptRoot "pmd-xpath-check.ps1"),
     [string]$OutDir = "",
     [ValidateSet("json")]
@@ -95,9 +99,9 @@ $repoItem = Get-Item $RepoPath
 $repoName = if ($repoItem.PSIsContainer) { $repoItem.Name } else { [System.IO.Path]::GetFileNameWithoutExtension($repoItem.Name) }
 
 # If OutDir not specified by user, auto-generate descriptive name
-# Format: out/catalog-run_<RepoBaseName>_<YYYYmmdd-HHmmss>
+# Format: out/catalog-runs/catalog-run_<RepoBaseName>_<YYYYmmdd-HHmmss>
 if (-not $OutDir) {
-    $baseOut = Join-Path (Get-Location) "out"
+    $baseOut = Join-Path (Join-Path (Get-Location) "out") "catalog-runs"
     $OutDir = Join-Path $baseOut ("catalog-run_{0}_{1}" -f $repoName, (Get-Timestamp))
 }
 
