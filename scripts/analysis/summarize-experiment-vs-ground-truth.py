@@ -227,9 +227,68 @@ def write_markdown_table(path: Path, title: str, rows: list[dict], fieldnames: l
             f.write("| " + " | ".join(str(row.get(name, "")) for name in fieldnames) + " |\n")
 
 
-def write_structural_similarity_summaries(structural_results_path: Path, out_dir: Path, label: str) -> None:
-    """Summarize structural-similarity rows into overall and per-rule thesis tables."""
-    rows = read_json_records(structural_results_path)
+def find_associated_run_spec(structural_results_path: Path, experiment_root: Path) -> dict | None:
+    """Best-effort lookup of the run-spec matching one structural-similarity result file."""
+    current = structural_results_path.parent
+    experiment_root = experiment_root.resolve()
+
+    while True:
+        direct_candidate = current / "run-spec.json"
+        if direct_candidate.exists():
+            return json.loads(direct_candidate.read_text(encoding="utf-8-sig"))
+
+        descendant_candidates = list(current.glob("runCount_*/run-spec.json"))
+        if len(descendant_candidates) == 1:
+            return json.loads(descendant_candidates[0].read_text(encoding="utf-8-sig"))
+        if len(descendant_candidates) > 1:
+            raise ValueError(
+                f"Multiple run-spec.json files found under {current}; cannot uniquely associate {structural_results_path}"
+            )
+
+        if current == experiment_root or current.parent == current:
+            break
+        current = current.parent
+
+    return None
+
+
+def load_structural_rows(
+    structural_results_path: Path | None,
+    experiment_root: Path,
+) -> tuple[list[dict], str]:
+    """Load structural results either from one file or by scanning the experiment tree."""
+    if structural_results_path is not None:
+        rows = read_json_records(structural_results_path)
+        return rows, structural_results_path.stem
+
+    structural_files = sorted(experiment_root.rglob("structural-similarity.jsonl"))
+    rows = []
+    for structural_file in structural_files:
+        spec = find_associated_run_spec(structural_file, experiment_root)
+        for row in read_json_records(structural_file):
+            enriched = dict(row)
+            if spec is not None:
+                enriched["target"] = Path(str(spec.get("target", ""))).name
+                enriched["model"] = str(spec.get("model", ""))
+                enriched["promptStyle"] = str(spec.get("promptStyle", ""))
+                enriched["temperature"] = str(spec.get("temperature", ""))
+                enriched["runCount"] = str(spec.get("runCount", ""))
+                enriched["runName"] = str(spec.get("runName", ""))
+            rows.append(enriched)
+    return rows, experiment_root.name
+
+
+def write_structural_similarity_summaries(
+    structural_results_path: Path | None,
+    experiment_root: Path,
+    out_dir: Path,
+    label: str,
+) -> None:
+    """Summarize structural-similarity rows into overall, per-condition, and per-rule thesis tables."""
+    rows, inferred_label = load_structural_rows(structural_results_path, experiment_root)
+    if not label:
+        label = inferred_label
+
     comparable_rows = [row for row in rows if row.get("structurallyComparable")]
 
     overall_scores = [float(row["overallStructuralSimilarity"]) for row in comparable_rows]
@@ -239,6 +298,7 @@ def write_structural_similarity_summaries(structural_results_path: Path, out_dir
 
     overall_summary_rows = [
         {
+            "scope": "overall",
             "label": label,
             "totalPairs": len(rows),
             "structurallyComparableCount": len(comparable_rows),
@@ -255,10 +315,56 @@ def write_structural_similarity_summaries(structural_results_path: Path, out_dir
         }
     ]
 
+    grouped_rows = defaultdict(list)
+    for row in rows:
+        key = (
+            str(row.get("target", "")),
+            str(row.get("model", "")),
+            str(row.get("promptStyle", "")),
+            str(row.get("temperature", "")),
+            str(row.get("runCount", "")),
+        )
+        grouped_rows[key].append(row)
+
+    for key, condition_rows in sorted(grouped_rows.items()):
+        condition_comparable = [row for row in condition_rows if row.get("structurallyComparable")]
+        condition_overall = [float(row["overallStructuralSimilarity"]) for row in condition_comparable]
+        condition_node = [float(row["nodeLabelJaccard"]) for row in condition_comparable]
+        condition_edge = [float(row["edgeLabelJaccard"]) for row in condition_comparable]
+        condition_scalar = [float(row["scalarFeatureSimilarity"]) for row in condition_comparable]
+        overall_summary_rows.append(
+            {
+                "scope": "condition",
+                "label": label,
+                "target": key[0],
+                "model": key[1],
+                "promptStyle": key[2],
+                "temperature": key[3],
+                "runCount": key[4],
+                "totalPairs": len(condition_rows),
+                "structurallyComparableCount": len(condition_comparable),
+                "structurallyComparablePct": percent(len(condition_comparable), len(condition_rows)),
+                "llmParsedCount": sum(1 for row in condition_rows if row.get("parseSuccessLlm")),
+                "groundTruthParsedCount": sum(1 for row in condition_rows if row.get("parseSuccessGroundTruth")),
+                "meanOverallStructuralSimilarity": mean_or_zero(condition_overall),
+                "medianOverallStructuralSimilarity": median_or_zero(condition_overall),
+                "minOverallStructuralSimilarity": min_or_zero(condition_overall),
+                "maxOverallStructuralSimilarity": max_or_zero(condition_overall),
+                "meanNodeLabelJaccard": mean_or_zero(condition_node),
+                "meanEdgeLabelJaccard": mean_or_zero(condition_edge),
+                "meanScalarFeatureSimilarity": mean_or_zero(condition_scalar),
+            }
+        )
+
     per_rule_rows = []
     for row in sorted(rows, key=lambda item: str(item.get("ruleKey"))):
         per_rule_rows.append(
             {
+                "target": row.get("target", ""),
+                "model": row.get("model", ""),
+                "promptStyle": row.get("promptStyle", ""),
+                "temperature": row.get("temperature", ""),
+                "runCount": row.get("runCount", ""),
                 "ruleKey": row.get("ruleKey"),
                 "groundTruthRuleKey": row.get("groundTruthRuleKey"),
                 "parseSuccessLlm": row.get("parseSuccessLlm"),
@@ -273,7 +379,13 @@ def write_structural_similarity_summaries(structural_results_path: Path, out_dir
         )
 
     overall_fields = [
+        "scope",
         "label",
+        "target",
+        "model",
+        "promptStyle",
+        "temperature",
+        "runCount",
         "totalPairs",
         "structurallyComparableCount",
         "structurallyComparablePct",
@@ -288,6 +400,11 @@ def write_structural_similarity_summaries(structural_results_path: Path, out_dir
         "meanScalarFeatureSimilarity",
     ]
     per_rule_fields = [
+        "target",
+        "model",
+        "promptStyle",
+        "temperature",
+        "runCount",
         "ruleKey",
         "groundTruthRuleKey",
         "parseSuccessLlm",
@@ -436,12 +553,18 @@ def main() -> int:
     write_markdown_table(out_dir / "syntax_execution_summary.md", "# Syntax / Execution Summary", syntax_rows, syntax_fields)
     write_markdown_table(out_dir / "behavioral_agreement_summary.md", "# Behavioral Agreement Summary", behavior_rows, behavior_fields)
 
-    if args.structural_results:
-        write_structural_similarity_summaries(Path(args.structural_results), out_dir, args.structural_label)
+    structural_results_path = Path(args.structural_results) if args.structural_results else None
+    if structural_results_path is not None or any(Path(args.experiment_root).rglob("structural-similarity.jsonl")):
+        write_structural_similarity_summaries(
+            structural_results_path,
+            Path(args.experiment_root),
+            out_dir,
+            args.structural_label,
+        )
 
     print(f"Wrote syntax summary to {out_dir / 'syntax_execution_summary.csv'}")
     print(f"Wrote behavior summary to {out_dir / 'behavioral_agreement_summary.csv'}")
-    if args.structural_results:
+    if structural_results_path is not None or any(Path(args.experiment_root).rglob("structural-similarity.jsonl")):
         print(f"Wrote structural summary to {out_dir / 'structural_similarity_summary.csv'}")
     return 0
 

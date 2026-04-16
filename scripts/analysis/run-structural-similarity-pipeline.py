@@ -113,17 +113,23 @@ def process_pair(
     similarity_script: Path,
     catalog_path: Path,
     llm_xpaths: Path,
-    gt_xpaths: Path,
+    gt_xpaths: Path | None,
+    gt_asts_source: Path | None,
     out_dir: Path,
     force: bool,
 ) -> None:
     """Run AST parsing and structural comparison for one LLM/GT XPath pair."""
     llm_asts = out_dir / "llm-xpath-asts.jsonl"
-    gt_asts = out_dir / "gt-xpath-asts.jsonl"
     similarity = out_dir / "structural-similarity.jsonl"
 
     parse_xpath_file(repo_root, java_exe, parser_jar, llm_xpaths, llm_asts, force)
-    parse_xpath_file(repo_root, java_exe, parser_jar, gt_xpaths, gt_asts, force)
+    if gt_asts_source is not None:
+        gt_asts = gt_asts_source
+    elif gt_xpaths is not None:
+        gt_asts = out_dir / "gt-xpath-asts.jsonl"
+        parse_xpath_file(repo_root, java_exe, parser_jar, gt_xpaths, gt_asts, force)
+    else:
+        raise ValueError("Either gt_xpaths or gt_asts_source must be provided")
     compute_similarity(
         repo_root,
         python_exe,
@@ -153,6 +159,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--llm-xpaths", help="Single LLM-generated XPath JSONL input")
     parser.add_argument("--ground-truth-xpaths", help="Ground-truth XPath JSONL input")
+    parser.add_argument("--ground-truth-asts", help="Precomputed ground-truth AST JSONL input")
     parser.add_argument("--out-dir", help="Output directory for single-pair mode")
     parser.add_argument("--experiment-root", help="Experiment root to scan for generation/**/generated.jsonl files")
     parser.add_argument("--parser-jar", help="Path to the shaded Java AST parser jar")
@@ -171,6 +178,11 @@ def main() -> int:
 
     build_parser_if_needed(repo_root, parser_jar, args.skip_build)
 
+    if args.ground_truth_xpaths and args.ground_truth_asts:
+        raise ValueError("Use either --ground-truth-xpaths or --ground-truth-asts, not both")
+    gt_xpaths_arg = Path(args.ground_truth_xpaths).resolve() if args.ground_truth_xpaths else None
+    gt_asts_arg = Path(args.ground_truth_asts).resolve() if args.ground_truth_asts else None
+
     single_mode = bool(args.llm_xpaths or args.ground_truth_xpaths or args.out_dir)
     batch_mode = bool(args.experiment_root)
 
@@ -178,8 +190,10 @@ def main() -> int:
         raise ValueError("Use either single-pair mode (--llm-xpaths/--ground-truth-xpaths/--out-dir) or --experiment-root, not both")
 
     if single_mode:
-        if not args.llm_xpaths or not args.ground_truth_xpaths or not args.out_dir:
-            raise ValueError("Single-pair mode requires --llm-xpaths, --ground-truth-xpaths, and --out-dir")
+        if not args.llm_xpaths or not args.out_dir:
+            raise ValueError("Single-pair mode requires --llm-xpaths and --out-dir")
+        if gt_xpaths_arg is None and gt_asts_arg is None:
+            raise ValueError("Single-pair mode requires either --ground-truth-xpaths or --ground-truth-asts")
 
         process_pair(
             repo_root,
@@ -189,7 +203,8 @@ def main() -> int:
             similarity_script=similarity_script,
             catalog_path=catalog_path,
             llm_xpaths=Path(args.llm_xpaths).resolve(),
-            gt_xpaths=Path(args.ground_truth_xpaths).resolve(),
+            gt_xpaths=gt_xpaths_arg,
+            gt_asts_source=gt_asts_arg,
             out_dir=Path(args.out_dir).resolve(),
             force=args.force,
         )
@@ -201,10 +216,9 @@ def main() -> int:
         generated_files = find_generated_jsonl_files(experiment_root)
         if not generated_files:
             raise FileNotFoundError(f"No generated.jsonl files found under {experiment_root}")
-        if not args.ground_truth_xpaths:
-            raise ValueError("Batch mode requires --ground-truth-xpaths")
+        if gt_xpaths_arg is None and gt_asts_arg is None:
+            raise ValueError("Batch mode requires either --ground-truth-xpaths or --ground-truth-asts")
 
-        gt_xpaths = Path(args.ground_truth_xpaths).resolve()
         print(f"Found {len(generated_files)} generated JSONL file(s) under {experiment_root}")
         for index, generated_jsonl in enumerate(generated_files, start=1):
             structural_dir = inferred_structural_dir(generated_jsonl)
@@ -217,7 +231,8 @@ def main() -> int:
                 similarity_script=similarity_script,
                 catalog_path=catalog_path,
                 llm_xpaths=generated_jsonl,
-                gt_xpaths=gt_xpaths,
+                gt_xpaths=gt_xpaths_arg,
+                gt_asts_source=gt_asts_arg,
                 out_dir=structural_dir,
                 force=args.force,
             )
