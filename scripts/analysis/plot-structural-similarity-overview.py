@@ -32,12 +32,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Plot a structural-similarity overview from summary CSV outputs."
     )
-    parser.add_argument("--structural-summary", required=True, help="Path to structural_similarity_summary.csv")
-    parser.add_argument("--structural-per-rule", required=True, help="Path to structural_similarity_per_rule.csv")
+    parser.add_argument("--structural-summary", required=True,
+                        help="Path to structural_similarity_summary.csv")
+    parser.add_argument("--structural-per-rule", required=True,
+                        help="Path to structural_similarity_per_rule.csv")
     parser.add_argument("--out-figure", required=True, help="Output PNG path")
     args = parser.parse_args()
 
     try:
+        import matplotlib
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
     except ImportError as exc:
@@ -61,15 +65,22 @@ def main() -> int:
             continue
         prompt_style = str(row.get("promptStyle", "all"))
         temperature = str(row.get("temperature", "all"))
-        grouped[(prompt_style, temperature)].append(row)
+        run_count = str(row.get("runCount", "all"))
+        grouped[(prompt_style, temperature, run_count)].append(row)
 
     if not grouped:
         # Fall back to one combined group when the per-rule CSV has no prompt/temperature columns.
-        comparable_rows = [row for row in per_rule_rows if str(row.get("structurallyComparable", "")).lower() == "true"]
-        grouped[("all", "all")] = comparable_rows
+        comparable_rows = [row for row in per_rule_rows if str(
+            row.get("structurallyComparable", "")).lower() == "true"]
+        grouped[("all", "all", "all")] = comparable_rows
 
     ordered_keys = sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
-    labels = [f"{key[0]}\nT={key[1]}" if key != ("all", "all") else "all rules" for key in ordered_keys]
+    labels = [
+        f"{key[0]}\nT={key[1]}\nrun {key[2]}"
+        if key != ("all", "all", "all")
+        else "all rules"
+        for key in ordered_keys
+    ]
 
     overall_box_data = []
     comparable_pct = []
@@ -78,32 +89,48 @@ def main() -> int:
     mean_scalar = []
     median_scores = []
 
-    total_pairs = len(per_rule_rows)
-    total_comparable = sum(1 for row in per_rule_rows if str(row.get("structurallyComparable", "")).lower() == "true")
-    default_comparable_pct = 100.0 * total_comparable / total_pairs if total_pairs else 0.0
-
     for key in ordered_keys:
         rows = grouped[key]
-        overall_scores = sorted(float(row.get("overallStructuralSimilarity", 0.0)) for row in rows)
+        overall_scores = sorted(
+            float(row.get("overallStructuralSimilarity", 0.0)) for row in rows)
         node_scores = [float(row.get("nodeLabelJaccard", 0.0)) for row in rows]
         edge_scores = [float(row.get("edgeLabelJaccard", 0.0)) for row in rows]
-        scalar_scores = [float(row.get("scalarFeatureSimilarity", 0.0)) for row in rows]
+        scalar_scores = [
+            float(row.get("scalarFeatureSimilarity", 0.0)) for row in rows]
+
+        all_group_rows = [
+            row
+            for row in per_rule_rows
+            if str(row.get("promptStyle", "all")) == key[0]
+            and str(row.get("temperature", "all")) == str(key[1])
+            and str(row.get("runCount", "all")) == str(key[2])
+        ]
+        group_total = len(all_group_rows)
+        group_comparable = len(rows)
+        group_comparable_pct = 100.0 * group_comparable / \
+            group_total if group_total else 0.0
 
         overall_box_data.append(overall_scores if overall_scores else [0.0])
-        comparable_pct.append(default_comparable_pct)
-        mean_node.append(sum(node_scores) / len(node_scores) if node_scores else 0.0)
-        mean_edge.append(sum(edge_scores) / len(edge_scores) if edge_scores else 0.0)
-        mean_scalar.append(sum(scalar_scores) / len(scalar_scores) if scalar_scores else 0.0)
-        median_scores.append(percentile(overall_scores, 0.5) if overall_scores else 0.0)
+        comparable_pct.append(group_comparable_pct)
+        mean_node.append(sum(node_scores) / len(node_scores)
+                         if node_scores else 0.0)
+        mean_edge.append(sum(edge_scores) / len(edge_scores)
+                         if edge_scores else 0.0)
+        mean_scalar.append(sum(scalar_scores) /
+                           len(scalar_scores) if scalar_scores else 0.0)
+        median_scores.append(percentile(overall_scores, 0.5)
+                             if overall_scores else 0.0)
 
-    prompt_styles = sorted({key[0] for key in ordered_keys})
+    prompt_style_runs = sorted({(key[0], key[2]) for key in ordered_keys})
     temperatures = sorted({str(key[1]) for key in ordered_keys})
-    heatmap = np.full((len(prompt_styles), len(temperatures)), np.nan)
+    heatmap = np.full((len(prompt_style_runs), len(temperatures)), np.nan)
     for key, median in zip(ordered_keys, median_scores):
-        heatmap[prompt_styles.index(key[0]), temperatures.index(str(key[1]))] = median
+        heatmap[prompt_style_runs.index(
+            (key[0], key[2])), temperatures.index(str(key[1]))] = median
 
     fig_width = max(10.0, len(labels) * 1.5)
-    fig, axes = plt.subplots(2, 2, figsize=(fig_width, 9), constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(
+        fig_width, 9), constrained_layout=True)
 
     ax = axes[0, 0]
     bp = ax.boxplot(
@@ -124,7 +151,7 @@ def main() -> int:
 
     ax = axes[0, 1]
     ax.bar(np.arange(len(labels)), comparable_pct, color="#4c9f70")
-    ax.set_title("Structurally Comparable Pairs")
+    ax.set_title("Pairs Were Both XPath ASTs Parsed")
     ax.set_ylabel("Percent")
     ax.set_ylim(0, 100)
     ax.set_xticks(np.arange(len(labels)))
@@ -135,7 +162,8 @@ def main() -> int:
     xpos = np.arange(len(labels))
     ax.bar(xpos - width, mean_node, width=width, label="Node", color="#4c78a8")
     ax.bar(xpos, mean_edge, width=width, label="Edge", color="#f58518")
-    ax.bar(xpos + width, mean_scalar, width=width, label="Scalar", color="#54a24b")
+    ax.bar(xpos + width, mean_scalar, width=width,
+           label="Scalar", color="#54a24b")
     ax.set_title("Mean Structural Components")
     ax.set_ylabel("Similarity")
     ax.set_ylim(0, 1)
@@ -148,15 +176,17 @@ def main() -> int:
     ax.set_title("Median Structural Similarity Heatmap")
     ax.set_xticks(np.arange(len(temperatures)))
     ax.set_xticklabels([f"T={value}" for value in temperatures])
-    ax.set_yticks(np.arange(len(prompt_styles)))
-    ax.set_yticklabels(prompt_styles)
-    for row_index in range(len(prompt_styles)):
+    ax.set_yticks(np.arange(len(prompt_style_runs)))
+    ax.set_yticklabels([f"{prompt}\nrun {run}" for prompt, run in prompt_style_runs])
+    for row_index in range(len(prompt_style_runs)):
         for col_index in range(len(temperatures)):
             value = heatmap[row_index, col_index]
             if math.isnan(value):
                 continue
-            ax.text(col_index, row_index, f"{value:.2f}", ha="center", va="center", color="black", fontsize=9)
-    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="Median similarity")
+            ax.text(col_index, row_index,
+                    f"{value:.2f}", ha="center", va="center", color="black", fontsize=9)
+    fig.colorbar(image, ax=ax, fraction=0.046,
+                 pad=0.04, label="Median similarity")
 
     fig.suptitle(f"Structural Similarity Overview - {label}", fontsize=14)
 

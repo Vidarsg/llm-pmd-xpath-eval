@@ -150,7 +150,7 @@ def find_generated_jsonl_files(experiment_root: Path) -> list[Path]:
 def inferred_structural_dir(generated_jsonl: Path) -> Path:
     """Place structural-analysis artifacts next to generation/evaluation inside the run root."""
     generation_dir = generated_jsonl.parent
-    run_root = generation_dir.parent.parent.parent
+    run_root = generation_dir.parent.parent
     return run_root / "structural"
 
 

@@ -1,6 +1,7 @@
 import argparse
 import csv
 import math
+from collections import defaultdict
 from pathlib import Path
 
 
@@ -35,16 +36,39 @@ def row_label(row: dict, include_target: bool, include_model: bool) -> str:
     return "\n".join(parts)
 
 
+def category_order_key(value: str) -> tuple[int, str]:
+    preferred = [
+        "Best Practices",
+        "Code Style",
+        "Design",
+        "Documentation",
+        "Error Prone",
+        "Multithreading",
+        "Performance",
+        "Security",
+    ]
+    if value in preferred:
+        return (preferred.index(value), value)
+    return (len(preferred), value)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Plot an experiment overview from syntax and behavioral summary CSV files."
     )
     parser.add_argument("--syntax-summary", required=True, help="Path to syntax_execution_summary.csv")
     parser.add_argument("--behavior-summary", required=True, help="Path to behavioral_agreement_summary.csv")
+    parser.add_argument(
+        "--behavior-per-rule",
+        required=True,
+        help="Path to behavioral_agreement_per_rule.csv",
+    )
     parser.add_argument("--out-figure", required=True, help="Output PNG path")
     args = parser.parse_args()
 
     try:
+        import matplotlib
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
     except ImportError as exc:
@@ -54,10 +78,13 @@ def main() -> int:
 
     syntax_rows = read_csv_rows(Path(args.syntax_summary))
     behavior_rows = read_csv_rows(Path(args.behavior_summary))
+    behavior_per_rule_rows = read_csv_rows(Path(args.behavior_per_rule))
     if not syntax_rows:
         raise SystemExit(f"No rows found in {args.syntax_summary}")
     if not behavior_rows:
         raise SystemExit(f"No rows found in {args.behavior_summary}")
+    if not behavior_per_rule_rows:
+        raise SystemExit(f"No rows found in {args.behavior_per_rule}")
 
     behavior_by_key = {row_key(row): row for row in behavior_rows}
     merged_rows = []
@@ -84,22 +111,35 @@ def main() -> int:
     exact_pct = np.array([float(row["exactPct"]) for row in merged_rows], dtype=float)
     overlap_pct = np.array([float(row["overlapPct"]) for row in merged_rows], dtype=float)
     file_level_pct = np.array([float(row["fileLevelPct"]) for row in merged_rows], dtype=float)
-    both_empty_pct = np.array([float(row["bothEmptyPct"]) for row in merged_rows], dtype=float)
     no_match_pct = np.array([float(row["noMatchPct"]) for row in merged_rows], dtype=float)
     non_comparable_pct = np.array([float(row["nonComparablePct"]) for row in merged_rows], dtype=float)
 
-    prompt_styles = sorted({row["promptStyle"] for row in merged_rows})
-    temperatures = sorted({str(row["temperature"]) for row in merged_rows}, key=lambda value: float(value))
-    heatmap = np.full((len(prompt_styles), len(temperatures)), np.nan)
-    for prompt_style in prompt_styles:
-        for temperature in temperatures:
-            matches = [
-                float(row["operationallyValidPct"])
-                for row in merged_rows
-                if row["promptStyle"] == prompt_style and str(row["temperature"]) == temperature
-            ]
-            if matches:
-                heatmap[prompt_styles.index(prompt_style), temperatures.index(temperature)] = sum(matches) / len(matches)
+    category_groups = defaultdict(list)
+    for row in behavior_per_rule_rows:
+        category = str(row.get("category", "Unknown"))
+        condition = (
+            str(row.get("target", "")),
+            str(row.get("model", "")),
+            str(row.get("promptStyle", "")),
+            str(row.get("temperature", "")),
+            str(row.get("runCount", "")),
+        )
+        category_groups[(category, condition)].append(row)
+
+    ordered_conditions = [row_key(row) for row in merged_rows]
+    categories = sorted({str(row.get("category", "Unknown")) for row in behavior_per_rule_rows}, key=category_order_key)
+    heatmap = np.full((len(categories), len(ordered_conditions)), np.nan)
+    for row_index, category in enumerate(categories):
+        for col_index, condition in enumerate(ordered_conditions):
+            rows = category_groups.get((category, condition), [])
+            if not rows:
+                continue
+            positive_non_empty = sum(
+                1
+                for row in rows
+                if str(row.get("matchType", "")) in {"exact", "overlap", "file-level"}
+            )
+            heatmap[row_index, col_index] = 100.0 * positive_non_empty / len(rows)
 
     fig_width = max(10.0, len(merged_rows) * 1.8)
     fig, axes = plt.subplots(2, 2, figsize=(fig_width, 9), constrained_layout=True)
@@ -116,10 +156,9 @@ def main() -> int:
     ax.legend(frameon=False, fontsize=9)
 
     ax = axes[0, 1]
-    ax.bar(x, both_empty_pct, color="#6aaed6", label="Both empty")
-    ax.bar(x, no_match_pct, bottom=both_empty_pct, color="#e17c05", label="No match")
-    ax.bar(x, non_comparable_pct, bottom=both_empty_pct + no_match_pct, color="#9c9c9c", label="Non-comparable")
-    ax.set_title("Behavioral Agreement Overview")
+    ax.bar(x, no_match_pct, color="#e17c05", label="No match")
+    ax.bar(x, non_comparable_pct, bottom=no_match_pct, color="#9c9c9c", label="Non-comparable")
+    ax.set_title("Negative / Unusable Behavioral Outcomes")
     ax.set_ylabel("Percent of rules")
     ax.set_ylim(0, 100)
     ax.set_xticks(x)
@@ -132,8 +171,7 @@ def main() -> int:
     ax.bar(xpos - 1.5 * width, exact_pct, width=width, label="Exact", color="#4c78a8")
     ax.bar(xpos - 0.5 * width, overlap_pct, width=width, label="Overlap", color="#72b7b2")
     ax.bar(xpos + 0.5 * width, file_level_pct, width=width, label="File-level", color="#f2cf5b")
-    ax.bar(xpos + 1.5 * width, both_empty_pct, width=width, label="Both-empty", color="#54a24b")
-    ax.set_title("Positive Agreement Categories")
+    ax.set_title("Positive Non-Empty Agreement Categories")
     ax.set_ylabel("Percent of rules")
     ax.set_ylim(0, 100)
     ax.set_xticks(xpos)
@@ -142,18 +180,18 @@ def main() -> int:
 
     ax = axes[1, 1]
     image = ax.imshow(heatmap, cmap="YlGn", vmin=0, vmax=100, aspect="auto")
-    ax.set_title("Operational Validity Heatmap")
-    ax.set_xticks(np.arange(len(temperatures)))
-    ax.set_xticklabels([f"T={value}" for value in temperatures])
-    ax.set_yticks(np.arange(len(prompt_styles)))
-    ax.set_yticklabels(prompt_styles)
-    for row_index in range(len(prompt_styles)):
-        for col_index in range(len(temperatures)):
+    ax.set_title("Positive Non-Empty Agreement by Rule Category")
+    ax.set_xticks(np.arange(len(labels)))
+    ax.set_xticklabels(labels, rotation=35, ha="right")
+    ax.set_yticks(np.arange(len(categories)))
+    ax.set_yticklabels(categories)
+    for row_index in range(len(categories)):
+        for col_index in range(len(labels)):
             value = heatmap[row_index, col_index]
             if math.isnan(value):
                 continue
             ax.text(col_index, row_index, f"{value:.1f}", ha="center", va="center", color="black", fontsize=9)
-    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="Operational validity %")
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="Positive non-empty agreement %")
 
     fig.suptitle("Experiment Overview From Summary Tables", fontsize=14)
 

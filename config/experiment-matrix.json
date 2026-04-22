@@ -1,11 +1,11 @@
 {
-  "experimentName": "test-experiment",
+  "experimentName": "test-experiment-0.7",
   "outputRoot": "out/experiments",
   "generatorScript": "scripts/generation/llm-xpath-generator.py",
   "validatorScript": "scripts/pmd/validate-llm-generated-xpaths.ps1",
   "runs": [
     {
-      "name": "gpt-oss-120b on WebGoat",
+      "name": "gpt-oss-120b-0.7 on WebGoat",
       "inputRules": "config/pmd-official-rule-descriptions.jsonl",
       "targets": [
         "C:/users/vidar/desktop/WebGoat/src"
@@ -18,14 +18,12 @@
         }
       ],
       "promptStyles": [
-        "zero-shot",
         "few-shot"
       ],
       "temperatures": [
-        0.0,
-        1.0
+        0.7
       ],
-      "runCount": 1,
+      "runCount": 2,
       "maxTokens": 1500
     }
   ]

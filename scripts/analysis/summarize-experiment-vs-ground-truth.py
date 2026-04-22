@@ -43,6 +43,12 @@ def load_catalog_rule_order(catalog_path: Path) -> dict[int, str]:
     return mapping
 
 
+def load_catalog_rule_metadata(catalog_path: Path) -> dict[str, dict]:
+    """Load PMD catalog metadata keyed by rule id."""
+    data = json.loads(catalog_path.read_text(encoding="utf-8"))
+    return dict(data.get("rules") or {})
+
+
 def spec_key(obj: dict) -> tuple[str, str, str, str, str, str]:
     """Build a stable key that identifies one concrete experiment run."""
     return (
@@ -448,11 +454,14 @@ def main() -> int:
     aggregated_rows = read_json_records(Path(args.aggregated_results))
     run_report_dirs = load_run_report_dirs(Path(args.experiment_root))
     gt_index, gt_reports_dir = load_ground_truth_index(Path(args.ground_truth_results))
-    catalog_index = load_catalog_rule_order(Path(args.catalog_path))
+    catalog_path = Path(args.catalog_path)
+    catalog_index = load_catalog_rule_order(catalog_path)
+    catalog_metadata = load_catalog_rule_metadata(catalog_path)
     report_cache: dict[Path, dict] = {}
 
     syntax_counters = defaultdict(Counter)
     behavior_counters = defaultdict(Counter)
+    behavior_per_rule_rows = []
 
     for row in aggregated_rows:
         group = row_group_key(row)
@@ -465,15 +474,45 @@ def main() -> int:
         )
 
         mapped_rule_id = catalog_index.get(int(row["ruleKey"])) if str(row["ruleKey"]).isdigit() else str(row["ruleKey"])
+        rule_metadata = catalog_metadata.get(str(mapped_rule_id), {})
+        rule_category = str(rule_metadata.get("category", "Unknown"))
         gt_row = gt_index.get(str(mapped_rule_id))
         if gt_row is None:
+            behavior_counters[group]["totalRules"] += 1
             behavior_counters[group]["non-comparable"] += 1
+            behavior_per_rule_rows.append(
+                {
+                    "target": group[0],
+                    "model": group[1],
+                    "promptStyle": group[2],
+                    "temperature": group[3],
+                    "runCount": group[4],
+                    "ruleKey": row.get("ruleKey"),
+                    "catalogId": mapped_rule_id,
+                    "category": rule_category,
+                    "matchType": "non-comparable",
+                }
+            )
             continue
 
         run_key = spec_key(row)
         llm_report_dir = run_report_dirs.get(run_key)
         if llm_report_dir is None:
+            behavior_counters[group]["totalRules"] += 1
             behavior_counters[group]["non-comparable"] += 1
+            behavior_per_rule_rows.append(
+                {
+                    "target": group[0],
+                    "model": group[1],
+                    "promptStyle": group[2],
+                    "temperature": group[3],
+                    "runCount": group[4],
+                    "ruleKey": row.get("ruleKey"),
+                    "catalogId": mapped_rule_id,
+                    "category": rule_category,
+                    "matchType": "non-comparable",
+                }
+            )
             continue
 
         llm_report = parse_report_violations(llm_report_dir / f"{row['ruleKey']}.json", report_cache)
@@ -481,6 +520,19 @@ def main() -> int:
         match_type = classify_behavior(llm_report, gt_report)
         behavior_counters[group]["totalRules"] += 1
         behavior_counters[group][match_type] += 1
+        behavior_per_rule_rows.append(
+            {
+                "target": group[0],
+                "model": group[1],
+                "promptStyle": group[2],
+                "temperature": group[3],
+                "runCount": group[4],
+                "ruleKey": row.get("ruleKey"),
+                "catalogId": mapped_rule_id,
+                "category": rule_category,
+                "matchType": match_type,
+            }
+        )
 
     syntax_rows = []
     for group, counts in sorted(syntax_counters.items()):
@@ -547,9 +599,21 @@ def main() -> int:
         "noMatchCount", "noMatchPct",
         "nonComparableCount", "nonComparablePct",
     ]
+    behavior_per_rule_fields = [
+        "target",
+        "model",
+        "promptStyle",
+        "temperature",
+        "runCount",
+        "ruleKey",
+        "catalogId",
+        "category",
+        "matchType",
+    ]
 
     write_csv(out_dir / "syntax_execution_summary.csv", syntax_rows, syntax_fields)
     write_csv(out_dir / "behavioral_agreement_summary.csv", behavior_rows, behavior_fields)
+    write_csv(out_dir / "behavioral_agreement_per_rule.csv", behavior_per_rule_rows, behavior_per_rule_fields)
     write_markdown_table(out_dir / "syntax_execution_summary.md", "# Syntax / Execution Summary", syntax_rows, syntax_fields)
     write_markdown_table(out_dir / "behavioral_agreement_summary.md", "# Behavioral Agreement Summary", behavior_rows, behavior_fields)
 
