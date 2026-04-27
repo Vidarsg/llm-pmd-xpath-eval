@@ -4,17 +4,27 @@ import math
 from collections import defaultdict
 from pathlib import Path
 
+"""Create a compact visual overview of syntax and behavioral experiment results.
+
+The input CSVs are produced by summarize-experiment-vs-ground-truth.py. The
+figure is intended for quick comparison of experiment conditions rather than
+for recomputing any metrics.
+"""
+
 
 def read_csv_rows(path: Path) -> list[dict]:
+    """Read a CSV summary file as dictionaries."""
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
 
 
 def ensure_parent(path: Path) -> None:
+    """Create the output directory before writing a figure."""
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def row_key(row: dict) -> tuple[str, str, str, str, str]:
+    """Return the condition key shared by syntax and behavioral summaries."""
     return (
         str(row.get("target", "")),
         str(row.get("model", "")),
@@ -25,6 +35,7 @@ def row_key(row: dict) -> tuple[str, str, str, str, str]:
 
 
 def row_label(row: dict, include_target: bool, include_model: bool) -> str:
+    """Build a concise multi-line label for condition bars."""
     parts = []
     if include_model:
         parts.append(str(row["model"]))
@@ -37,6 +48,7 @@ def row_label(row: dict, include_target: bool, include_model: bool) -> str:
 
 
 def category_order_key(value: str) -> tuple[int, str]:
+    """Sort PMD categories in a stable, human-friendly order."""
     preferred = [
         "Best Practices",
         "Code Style",
@@ -94,6 +106,7 @@ def main() -> int:
             continue
         merged_rows.append({**syntax_row, **behavior_by_key[key]})
 
+    # Plot only conditions that have both syntax/execution and behavioral data.
     if not merged_rows:
         raise SystemExit("No overlapping conditions found between syntax and behavioral summary CSV files")
 
@@ -126,6 +139,8 @@ def main() -> int:
         )
         category_groups[(category, condition)].append(row)
 
+    # The heatmap shows how often each rule category produced a useful
+    # non-empty behavioral match for each experiment condition.
     ordered_conditions = [row_key(row) for row in merged_rows]
     categories = sorted({str(row.get("category", "Unknown")) for row in behavior_per_rule_rows}, key=category_order_key)
     heatmap = np.full((len(categories), len(ordered_conditions)), np.nan)

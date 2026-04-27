@@ -3,6 +3,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+"""Run the complete structural-similarity pipeline.
+
+This script glues together the Java/Saxon XPath AST parser and the Python
+similarity calculator. It supports a single generated/ground-truth pair or an
+entire experiment tree containing generation/**/generated.jsonl files.
+"""
+
 
 def file_has_content(path: Path) -> bool:
     """Treat an existing non-empty file as a completed pipeline artifact."""
@@ -31,6 +38,8 @@ def default_parser_jar(repo_root: Path) -> Path:
 
 def build_parser_if_needed(repo_root: Path, parser_jar: Path, skip_build: bool) -> None:
     """Build the Java XPath AST parser when the jar is missing and builds are allowed."""
+    # The parser is packaged as a shaded jar so the pipeline can run it without
+    # separately managing Saxon/Jackson classpaths.
     if parser_jar.exists() and parser_jar.is_file():
         return
     if skip_build:
@@ -122,6 +131,8 @@ def process_pair(
     llm_asts = out_dir / "llm-xpath-asts.jsonl"
     similarity = out_dir / "structural-similarity.jsonl"
 
+    # Ground-truth ASTs can be reused across many experiment runs, but generated
+    # XPath files are parsed per run because they carry run metadata.
     parse_xpath_file(repo_root, java_exe, parser_jar, llm_xpaths, llm_asts, force)
     if gt_asts_source is not None:
         gt_asts = gt_asts_source
@@ -149,6 +160,8 @@ def find_generated_jsonl_files(experiment_root: Path) -> list[Path]:
 
 def inferred_structural_dir(generated_jsonl: Path) -> Path:
     """Place structural-analysis artifacts next to generation/evaluation inside the run root."""
+    # generated.jsonl lives under run_root/generation/<promptStyle>/, so two
+    # parents up returns the run root.
     generation_dir = generated_jsonl.parent
     run_root = generation_dir.parent.parent
     return run_root / "structural"
@@ -186,6 +199,7 @@ def main() -> int:
     single_mode = bool(args.llm_xpaths or args.ground_truth_xpaths or args.out_dir)
     batch_mode = bool(args.experiment_root)
 
+    # Keep the modes mutually exclusive so output layout is predictable.
     if single_mode and batch_mode:
         raise ValueError("Use either single-pair mode (--llm-xpaths/--ground-truth-xpaths/--out-dir) or --experiment-root, not both")
 

@@ -8,9 +8,11 @@ Install and configure these before running the repository scripts:
 
 - Python (preferably `3.11` or newer)
 - Java `17`
+- Maven, for building the XPath AST parser under `tools/xpath-ast-parser`
 - PMD `7.20.0`
 - PowerShell
-- Python package: `requests`
+- Python packages: `requests`
+- Optional plotting packages: `matplotlib`, `numpy`
 
 You also need:
 
@@ -23,10 +25,16 @@ Cross-platform notes:
 - On macOS and Linux, install PowerShell Core and run the scripts with `pwsh`
 - On macOS and Linux, the PMD launcher is typically the shell script in `bin/pmd`
 
-Install the Python dependency with:
+Install the Python dependencies with:
 
 ```powershell
 python -m pip install requests
+```
+
+Install plotting dependencies when you want to generate overview PNG figures:
+
+```powershell
+python -m pip install matplotlib numpy
 ```
 
 Set the API key in your environment before running the LLM generator:
@@ -58,13 +66,16 @@ The repository supports:
 - execution of both official and custom PMD XPath rules against local Java targets
 - matrix-based experiment orchestration across targets, models, prompt styles, temperatures, and repeated runs
 - aggregation of all evaluation outputs into one single JSONL file for convenient evaluation summary
+- structural comparison of generated XPath expressions against ground-truth XPath expressions using normalized XPath ASTs
+- thesis-ready CSV/Markdown summaries and PNG overview plots for syntax, behavior, and structural similarity results
 
 ## Tooling
 
 - PMD: `7.20.0`
 - Java: `17`
 - Rule type: PMD XPath rules for Java code
-- LLM interface: OpenAI-compatible `/v1/chat/completions`
+- LLM interface: OpenAI-compatible `/v1/chat/completions`, with optional `/v1/responses` support for OpenAI GPT-5 family models
+- Structural parser: Saxon-HE `12.5` wrapped by a small Java `17` CLI
 
 ## Repository Structure
 
@@ -84,14 +95,23 @@ The repository supports:
 - `scripts/analysis/`
   - [compute-xpath-structural-similarity.py](/scripts/analysis/compute-xpath-structural-similarity.py): compare normalized XPath ASTs and compute structural similarity metrics
   - [run-structural-similarity-pipeline.py](/scripts/analysis/run-structural-similarity-pipeline.py): parse XPath JSONL files into ASTs and run structural similarity in batch
-  - [summarize-experiment-vs-ground-truth.py](/scripts/analysis/summarize-experiment-vs-ground-truth.py): generate thesis-ready syntax, behavior, and structural summary tables
+  - [summarize-experiment-vs-ground-truth.py](/scripts/analysis/summarize-experiment-vs-ground-truth.py): generate syntax, behavior, and structural summary tables
+  - [plot-aggregated-overview.py](/scripts/analysis/plot-aggregated-overview.py): plot syntax/execution and behavioral agreement summaries
+  - [plot-structural-similarity-overview.py](/scripts/analysis/plot-structural-similarity-overview.py): plot structural-similarity distributions and component scores
+- `tools/xpath-ast-parser/`
+  - Java/Maven CLI that uses Saxon to parse XPath expressions into normalized AST JSONL records
+  - PMD extension functions such as `pmd-java:typeIs(...)` are registered as parse-time stubs so PMD rule XPath expressions can be parsed without evaluating them
 
 - `config/`
   - [pmd-catalog.json](/config/pmd-catalog.json): extracted PMD official rule catalog with all metadata
   - [pmd-official-rule-descriptions.jsonl](/config/pmd-official-rule-descriptions.jsonl): JSONL file containing only rule descriptions for the official PMD rules
-  - [example-rules.jsonl](/config/example-rules.jsonl): small example rule subset
+  - [pmd-official-rule-xpaths.jsonl](/config/pmd-official-rule-xpaths.jsonl): JSONL file containing only official PMD XPath expressions
+  - [pmd-official-rule-asts.jsonl](/config/pmd-official-rule-asts.jsonl): precomputed normalized ASTs for the official PMD XPath rules
+  - [example-rules.jsonl](/config/example-rules.jsonl): small example rule subset (used for testing)
+  - [example-rule-xpaths.jsonl](/config/example-rule-xpaths.jsonl): small example XPath subset (used for testing)
   - [experiment-matrix.json](/config/experiment-matrix.json): full experiment pipeline definition
-  - `custom-rulesets/`: custom PMD rulesets collected from public GithHub repositories
+  - [xpath-ast-schema.md](/config/xpath-ast-schema.md): schema and metric notes for normalized XPath AST records
+  - `custom-rulesets/`: custom PMD rulesets collected from public GitHub repositories
 - `java-classes/`: minimal example Java files for experiment testing
 - `out/`: generated outputs, reports, and experiment artifacts
 
@@ -128,7 +148,7 @@ python .\scripts\generation\llm-xpath-generator.py `
   --temperature 0.7 `
   --max-tokens 2000 `
   --prompt-style zero-shot `
-  --api-key <YOUR_API_Key>
+  --api-key API_KEY
 ```
 
 The generator automatically places outputs under prompt-style subfolders when writing into `llm-output`, for example:
@@ -324,6 +344,117 @@ python .\scripts\experiments\aggregate-experiment-results.py `
 
 Verbose path/debug fields like `reportPath`, `rulesetPath`, `stdoutPath`, and `stdoutSnippet` are intentionally omitted from the aggregate, preserving only fields relevant for the analysis.
 
+## XPath AST Parsing and Structural Similarity
+
+The repository includes a Java XPath AST parser under [tools/xpath-ast-parser](/tools/xpath-ast-parser). It uses Saxon to parse XPath syntax, then normalizes Saxon's internal expression tree into the schema documented in [xpath-ast-schema.md](/config/xpath-ast-schema.md).
+
+This parser is not a hand-written XPath grammar. It is a project-specific normalization layer over Saxon's XPath parser. PMD-specific functions such as `pmd-java:typeIs(...)`, `pmd-java:matchesSig(...)`, and `pmd-java:modifiers()` are registered as stubs so PMD XPath rules can be parsed without needing a live PMD Java AST evaluation context.
+
+Build the parser jar:
+
+```powershell
+Push-Location .\tools\xpath-ast-parser
+mvn clean package
+Pop-Location
+```
+
+Parse a JSONL file containing `xpath` fields into AST records:
+
+```powershell
+java -jar .\tools\xpath-ast-parser\target\xpath-ast-parser-1.0.0-jar-with-dependencies.jar `
+  --in .\config\pmd-official-rule-xpaths.jsonl `
+  --out .\out\pmd-official-rule-asts.jsonl
+```
+
+Each output row contains:
+
+```json
+{
+  "ruleKey": "SomeRule",
+  "xpath": "//MethodCall[@MethodName='println']",
+  "parseSuccess": true,
+  "parseError": null,
+  "ast": {
+    "kind": "PathExpr",
+    "name": null,
+    "operator": "/",
+    "valueType": null,
+    "value": null,
+    "children": []
+  }
+}
+```
+
+[run-structural-similarity-pipeline.py](/scripts/analysis/run-structural-similarity-pipeline.py) combines AST parsing and structural similarity scoring. It builds the parser jar if needed, parses generated XPath rules, optionally parses ground-truth XPath rules, and writes `structural-similarity.jsonl`.
+
+Single file-pair example:
+
+```powershell
+python .\scripts\analysis\run-structural-similarity-pipeline.py `
+  --llm-xpaths .\out\experiments\default-matrix\<run>\generation\zero-shot\generated.jsonl `
+  --ground-truth-asts .\config\pmd-official-rule-asts.jsonl `
+  --out-dir .\out\experiments\default-matrix\<run>\structural
+```
+
+Batch example for a whole experiment tree:
+
+```powershell
+python .\scripts\analysis\run-structural-similarity-pipeline.py `
+  --experiment-root .\out\experiments\default-matrix `
+  --ground-truth-asts .\config\pmd-official-rule-asts.jsonl
+```
+
+[compute-xpath-structural-similarity.py](/scripts/analysis/compute-xpath-structural-similarity.py) is the lower-level metric script used by the pipeline. It compares node-label multisets, edge-label multisets, and scalar AST features, then averages those components into `overallStructuralSimilarity`.
+
+## Summary Tables and Plots
+
+[summarize-experiment-vs-ground-truth.py](/scripts/analysis/summarize-experiment-vs-ground-truth.py) compares aggregated LLM validation results against ground-truth PMD reports. It writes syntax/execution summaries, behavioral agreement summaries, and structural-similarity summaries when structural results are available.
+
+Example:
+
+```powershell
+python .\scripts\analysis\summarize-experiment-vs-ground-truth.py `
+  --aggregated-results .\out\experiments\default-matrix\aggregated-results.jsonl `
+  --experiment-root .\out\experiments\default-matrix `
+  --ground-truth-results .\out\official-catalog-run\results.jsonl `
+  --catalog-path .\config\pmd-catalog.json `
+  --out-dir .\out\analysis-summary
+```
+
+Common summary outputs:
+
+```text
+out/analysis-summary/
+  syntax_execution_summary.csv
+  syntax_execution_summary.md
+  behavioral_agreement_summary.csv
+  behavioral_agreement_summary.md
+  behavioral_agreement_per_rule.csv
+  structural_similarity_summary.csv
+  structural_similarity_summary.md
+  structural_similarity_per_rule.csv
+  structural_similarity_per_rule.md
+```
+
+Create a syntax/behavior overview figure:
+
+```powershell
+python .\scripts\analysis\plot-aggregated-overview.py `
+  --syntax-summary .\out\analysis-summary\syntax_execution_summary.csv `
+  --behavior-summary .\out\analysis-summary\behavioral_agreement_summary.csv `
+  --behavior-per-rule .\out\analysis-summary\behavioral_agreement_per_rule.csv `
+  --out-figure .\out\analysis-summary\aggregated-overview.png
+```
+
+Create a structural-similarity overview figure:
+
+```powershell
+python .\scripts\analysis\plot-structural-similarity-overview.py `
+  --structural-summary .\out\analysis-summary\structural_similarity_summary.csv `
+  --structural-per-rule .\out\analysis-summary\structural_similarity_per_rule.csv `
+  --out-figure .\out\analysis-summary\structural-similarity-overview.png
+```
+
 ## Input Formats
 
 ### Rule Description JSONL
@@ -342,18 +473,29 @@ Used for validation:
 {"ruleKey": 1, "description": "Avoid printStackTrace(); use a logger instead.", "xpath": "//MethodCall[...]"}
 ```
 
+### XPath AST JSONL
+
+Used for structural similarity:
+
+```json
+{"ruleKey": 1, "xpath": "//MethodCall[@MethodName='println']", "parseSuccess": true, "parseError": null, "ast": {"kind": "PathExpr", "children": []}}
+```
+
 ## Notes
 
 - This framework assumes an OpenAI-compatible LLM endpoint.
-- `-PmdBin` must point to a real PMD executable; placeholder values will now fail fast.
+- `-PmdBin` must point to a real PMD executable; placeholder values will fail fast.
 - The PMD wrappers are intentionally one-rule-at-a-time so that each XPath gets isolated diagnostics and a separate report file.
 
 ## Typical End-to-End Flow
 
-1. Prepare a JSONL file containing descriptions of PMD rules.
+1. Prepare a JSONL file containing natural language descriptions of PMD rules.
 2. Use LLMs to generate XPath candidates with [llm-xpath-generator.py](/scripts/generation/llm-xpath-generator.py).
 3. Validate LLM-generated XPath expressions with [validate-llm-generated-xpaths.ps1](/scripts/pmd/validate-llm-generated-xpaths.ps1).
 4. Run PMD on ground truth rules with [run-catalog-on-target.ps1](/scripts/pmd/run-catalog-on-target.ps1) or [run-custom-rules-on-target.ps1](/scripts/pmd/run-custom-rules-on-target.ps1).
 5. Use [run-experiment-matrix.py](/scripts/experiments/run-experiment-matrix.py) for repeated large-scale experiments.
 6. Aggregate the results with [aggregate-experiment-results.py](/scripts/experiments/aggregate-experiment-results.py).
+7. Run [run-structural-similarity-pipeline.py](/scripts/analysis/run-structural-similarity-pipeline.py) to parse generated XPath expressions and compare them to ground-truth ASTs.
+8. Run [summarize-experiment-vs-ground-truth.py](/scripts/analysis/summarize-experiment-vs-ground-truth.py) to create CSV/Markdown summary tables.
+9. Use [plot-aggregated-overview.py](/scripts/analysis/plot-aggregated-overview.py) and [plot-structural-similarity-overview.py](/scripts/analysis/plot-structural-similarity-overview.py) to generate figures/tables from the results.
 

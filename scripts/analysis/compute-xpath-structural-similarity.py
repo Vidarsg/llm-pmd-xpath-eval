@@ -3,6 +3,13 @@ import json
 from collections import Counter
 from pathlib import Path
 
+"""Compare normalized XPath ASTs using lightweight structural features.
+
+The Java parser emits a deliberately small AST schema. This script turns those
+trees into comparable feature sets and writes one similarity row per generated
+rule, paired against its ground-truth rule.
+"""
+
 
 def read_json_records(path: Path) -> list[dict]:
     """Read either compact JSONL or concatenated JSON objects."""
@@ -78,6 +85,8 @@ def walk_ast(node: dict, parent_label: str | None, depth: int, features: dict) -
 
 def extract_features(ast: dict) -> dict:
     """Extract all structural features from one normalized XPath AST."""
+    # The three feature families mirror config/xpath-ast-schema.md: node labels,
+    # parent-child edge labels, and scalar counts such as number of predicates.
     features = {
         "nodeLabels": Counter(),
         "edgeLabels": Counter(),
@@ -127,6 +136,8 @@ def compute_similarity(left_ast: dict, right_ast: dict) -> dict:
     left_features = extract_features(left_ast)
     right_features = extract_features(right_ast)
 
+    # Each component captures a different aspect of structure: vocabulary,
+    # topology, and coarse size/shape. The final score weighs them equally.
     node_sim = weighted_jaccard(left_features["nodeLabels"], right_features["nodeLabels"])
     edge_sim = weighted_jaccard(left_features["edgeLabels"], right_features["edgeLabels"])
     scalar_sim = scalar_similarity(left_features["scalar"], right_features["scalar"])
@@ -152,6 +163,8 @@ def compute_similarity(left_ast: dict, right_ast: dict) -> dict:
 
 def pair_ground_truth_rule_key(llm_row: dict, gt_rows: dict[str, dict], catalog_index: dict[int, str]) -> str | None:
     """Resolve the matching ground-truth key, preferring direct id matches over catalog remapping."""
+    # Generated rows may carry a PMD id directly, or they may carry the numeric
+    # position from the original input file. Try direct identifiers first.
     direct_candidates = []
     for key_name in ("ruleKey", "catalogId", "ruleId", "id"):
         value = llm_row.get(key_name)
@@ -181,6 +194,7 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 def main() -> int:
+    """Load two AST JSONL files, pair their rows, and write similarity results."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--llm-asts", required=True, help="JSONL file with normalized ASTs for LLM-generated XPath rules")
     ap.add_argument("--ground-truth-asts", required=True, help="JSONL file with normalized ASTs for ground-truth XPath rules")
@@ -197,6 +211,8 @@ def main() -> int:
         gt_rule_key = pair_ground_truth_rule_key(llm_row, gt_rows, catalog_index)
         gt_row = gt_rows.get(gt_rule_key)
 
+        # Keep a row even when comparison is impossible so parse failures and
+        # missing ground-truth mappings remain visible in downstream summaries.
         out_row = {
             "ruleKey": llm_row["ruleKey"],
             "groundTruthRuleKey": gt_rule_key,

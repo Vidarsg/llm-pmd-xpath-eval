@@ -4,17 +4,26 @@ import math
 from collections import defaultdict
 from pathlib import Path
 
+"""Create an overview figure for XPath structural-similarity results.
+
+The script visualizes the CSV tables emitted by summarize-experiment-vs-ground-
+truth.py and focuses on comparable pairs where both XPath expressions parsed.
+"""
+
 
 def read_csv_rows(path: Path) -> list[dict]:
+    """Read a CSV summary file as dictionaries."""
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
 
 
 def ensure_parent(path: Path) -> None:
+    """Create the output directory before saving the plot."""
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def percentile(sorted_values: list[float], p: float) -> float:
+    """Compute a percentile from an already sorted list using linear interpolation."""
     if not sorted_values:
         return 0.0
     if len(sorted_values) == 1:
@@ -89,6 +98,8 @@ def main() -> int:
     mean_scalar = []
     median_scores = []
 
+    # Each condition gets a boxplot distribution plus mean component scores, so
+    # spread and metric composition are visible in the same figure.
     for key in ordered_keys:
         rows = grouped[key]
         overall_scores = sorted(

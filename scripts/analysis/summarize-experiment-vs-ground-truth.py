@@ -5,6 +5,13 @@ import statistics
 from collections import Counter, defaultdict
 from pathlib import Path
 
+"""Summarize generated XPath experiments against ground-truth PMD behavior.
+
+The script combines validation outputs, PMD JSON reports, catalog metadata, and
+optional structural-similarity rows into CSV/Markdown tables suitable for
+analysis and thesis reporting.
+"""
+
 
 def normalize_path(path: str) -> str:
     """Normalize paths so reports from different runs can be compared reliably."""
@@ -82,6 +89,8 @@ def parse_report_violations(report_path: Path, cache: dict[Path, dict]) -> dict:
     if report_path in cache:
         return cache[report_path]
 
+    # Missing reports mean the rule could not be compared behaviorally. Marking
+    # both error types keeps that case out of positive agreement categories.
     if not report_path.exists():
         result = {
             "files": {},
@@ -108,6 +117,8 @@ def parse_report_violations(report_path: Path, cache: dict[Path, dict]) -> dict:
             )
         files[filename] = sorted(spans)
 
+    # The validation wrapper adds scriptDetected* fields so syntax/configuration
+    # failures can be separated from ordinary "rule matched no files" outcomes.
     result = {
         "files": files,
         "hadConfigErrors": bool((data.get("scriptDetectedConfigurationErrors") or {}).get("hadConfigErrors", False)),
@@ -140,6 +151,8 @@ def all_spans_overlap(left: list[tuple[int, int, int, int]], right: list[tuple[i
 
 def classify_behavior(llm_report: dict, gt_report: dict) -> str:
     """Classify behavioral agreement between one LLM rule report and one ground-truth report."""
+    # Behavioral comparison only makes sense when both PMD runs completed well
+    # enough to produce trustworthy violation spans.
     if (
         llm_report["hadConfigErrors"]
         or llm_report["hadProcessingErrors"]
@@ -156,6 +169,8 @@ def classify_behavior(llm_report: dict, gt_report: dict) -> str:
     if not llm_files and not gt_files:
         return "both-empty"
 
+    # Exact is strict span equality; overlap and file-level progressively relax
+    # the comparison while still requiring the same affected files.
     if llm_files == gt_files:
         return "exact"
 
@@ -273,6 +288,8 @@ def load_structural_rows(
         spec = find_associated_run_spec(structural_file, experiment_root)
         for row in read_json_records(structural_file):
             enriched = dict(row)
+            # Structural result rows produced in batch mode do not always carry
+            # run metadata, so recover it from the nearest run-spec.json.
             if spec is not None:
                 enriched["target"] = Path(str(spec.get("target", ""))).name
                 enriched["model"] = str(spec.get("model", ""))
@@ -297,6 +314,8 @@ def write_structural_similarity_summaries(
 
     comparable_rows = [row for row in rows if row.get("structurallyComparable")]
 
+    # Overall rows capture the entire dataset; condition rows below split the
+    # same metrics by target/model/prompt/temperature/run.
     overall_scores = [float(row["overallStructuralSimilarity"]) for row in comparable_rows]
     node_scores = [float(row["nodeLabelJaccard"]) for row in comparable_rows]
     edge_scores = [float(row["edgeLabelJaccard"]) for row in comparable_rows]
@@ -332,6 +351,8 @@ def write_structural_similarity_summaries(
         )
         grouped_rows[key].append(row)
 
+    # Append one summary row per experimental condition so plotting scripts can
+    # compare runs without re-reading the JSONL source.
     for key, condition_rows in sorted(grouped_rows.items()):
         condition_comparable = [row for row in condition_rows if row.get("structurallyComparable")]
         condition_overall = [float(row["overallStructuralSimilarity"]) for row in condition_comparable]
@@ -364,6 +385,8 @@ def write_structural_similarity_summaries(
 
     per_rule_rows = []
     for row in sorted(rows, key=lambda item: str(item.get("ruleKey"))):
+        # The per-rule table keeps raw parse/comparison status so failures can
+        # be inspected without opening the large structural JSONL files.
         per_rule_rows.append(
             {
                 "target": row.get("target", ""),
@@ -463,6 +486,8 @@ def main() -> int:
     behavior_counters = defaultdict(Counter)
     behavior_per_rule_rows = []
 
+    # First pass: count syntactic/execution outcomes from validation rows and
+    # compare each generated rule's PMD report to its ground-truth report.
     for row in aggregated_rows:
         group = row_group_key(row)
         syntax_counters[group]["totalRules"] += 1
@@ -478,6 +503,8 @@ def main() -> int:
         rule_category = str(rule_metadata.get("category", "Unknown"))
         gt_row = gt_index.get(str(mapped_rule_id))
         if gt_row is None:
+            # Without a ground-truth record there is no meaningful behavioral
+            # comparison, but the row still counts toward the condition total.
             behavior_counters[group]["totalRules"] += 1
             behavior_counters[group]["non-comparable"] += 1
             behavior_per_rule_rows.append(
@@ -498,6 +525,8 @@ def main() -> int:
         run_key = spec_key(row)
         llm_report_dir = run_report_dirs.get(run_key)
         if llm_report_dir is None:
+            # If the run directory cannot be resolved, keep the rule visible as
+            # non-comparable instead of dropping it from the denominator.
             behavior_counters[group]["totalRules"] += 1
             behavior_counters[group]["non-comparable"] += 1
             behavior_per_rule_rows.append(
@@ -535,6 +564,7 @@ def main() -> int:
         )
 
     syntax_rows = []
+    # Convert counters into stable CSV rows with both counts and percentages.
     for group, counts in sorted(syntax_counters.items()):
         total = counts["totalRules"]
         syntax_rows.append(
@@ -557,6 +587,8 @@ def main() -> int:
         )
 
     behavior_rows = []
+    # Behavioral categories are mutually exclusive, so each count contributes to
+    # one percentage column in the summary table.
     for group, counts in sorted(behavior_counters.items()):
         total = counts["totalRules"]
         behavior_rows.append(
@@ -618,6 +650,8 @@ def main() -> int:
     write_markdown_table(out_dir / "behavioral_agreement_summary.md", "# Behavioral Agreement Summary", behavior_rows, behavior_fields)
 
     structural_results_path = Path(args.structural_results) if args.structural_results else None
+    # Structural summaries are optional because older experiment runs may only
+    # have syntax and behavioral validation artifacts.
     if structural_results_path is not None or any(Path(args.experiment_root).rglob("structural-similarity.jsonl")):
         write_structural_similarity_summaries(
             structural_results_path,

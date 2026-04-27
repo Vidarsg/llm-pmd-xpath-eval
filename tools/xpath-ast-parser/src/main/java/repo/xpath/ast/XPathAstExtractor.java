@@ -9,11 +9,21 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Converts one JSON row containing a PMD XPath expression into a normalized AST
+ * record.
+ *
+ * <p>Saxon performs the actual XPath parsing. This class adapts Saxon's
+ * internal expression objects into a small, stable AST shape used by the
+ * project's structural-similarity analysis.</p>
+ */
 public final class XPathAstExtractor {
+    /** Input metadata preserved next to parse results for later aggregation. */
     private static final List<String> PASSTHROUGH_KEYS = Arrays.asList(
             "model", "promptStyle", "target", "temperature", "runCount"
     );
 
+    /** Parses the row's XPath and returns a record that always includes status. */
     public AstRecord extract(Map<String, Object> row) {
         AstRecord record = new AstRecord();
         record.ruleKey = row.get("ruleKey");
@@ -37,6 +47,12 @@ public final class XPathAstExtractor {
         return record;
     }
 
+    /**
+     * Uses Saxon to parse XPath into an internal expression tree.
+     *
+     * <p>The reflective ExpressionTool.make lookup keeps the tool tolerant of
+     * small Saxon API signature changes across versions.</p>
+     */
     private Object parseXPath(String xpath) throws Exception {
         net.sf.saxon.Configuration configuration = new net.sf.saxon.Configuration();
         PmdExtensionFunctions.registerAll(configuration);
@@ -63,10 +79,15 @@ public final class XPathAstExtractor {
         throw new IllegalStateException("Could not find a compatible Saxon ExpressionTool.make(...) signature");
     }
 
+    /** Creates the static context that holds namespace and extension metadata. */
     private Object buildStaticContext(Object configuration) {
         return new net.sf.saxon.sxpath.IndependentContext((net.sf.saxon.Configuration) configuration);
     }
 
+    /**
+     * Declares a namespace while handling Saxon versions that use different
+     * declareNamespace signatures.
+     */
     private void declareNamespace(Object staticContext, String prefix, String uri) {
         try {
             try {
@@ -87,6 +108,9 @@ public final class XPathAstExtractor {
         }
     }
 
+    /**
+     * Builds arguments for whichever ExpressionTool.make overload is available.
+     */
     private Object[] buildExpressionToolArgs(Class<?>[] parameterTypes, String xpath, Object staticContext) {
         Object[] args = new Object[parameterTypes.length];
         boolean usedString = false;
@@ -123,6 +147,7 @@ public final class XPathAstExtractor {
         return usedString && usedContext ? args : null;
     }
 
+    /** Recursively normalizes a Saxon expression object into the output AST. */
     private AstNode toAst(Object expression) throws Exception {
         expression = unwrapExpression(expression);
         AstNode node = new AstNode(normalizeKind(expression));
@@ -137,6 +162,10 @@ public final class XPathAstExtractor {
         return node;
     }
 
+    /**
+     * Removes Saxon wrapper nodes that do not add useful structure for the
+     * comparison metric.
+     */
     private Object unwrapExpression(Object expression) throws Exception {
         String simpleName = expression.getClass().getSimpleName();
         if ("HomogeneityChecker".equals(simpleName)) {
@@ -148,6 +177,7 @@ public final class XPathAstExtractor {
         return expression;
     }
 
+    /** Maps Saxon implementation class names to a smaller, parser-independent vocabulary. */
     private String normalizeKind(Object expression) {
         String simpleName = expression.getClass().getSimpleName();
         String lower = simpleName.toLowerCase(Locale.ROOT);
@@ -164,6 +194,7 @@ public final class XPathAstExtractor {
         return simpleName;
     }
 
+    /** Extracts the most useful stable name Saxon exposes for an expression. */
     private String extractName(Object expression) throws Exception {
         String kind = normalizeKind(expression);
         for (String methodName : new String[]{
@@ -191,6 +222,7 @@ public final class XPathAstExtractor {
         return genericNameForKind(kind);
     }
 
+    /** Extracts a readable operator marker where Saxon exposes one. */
     private String extractOperator(Object expression) throws Exception {
         String kind = normalizeKind(expression);
         if ("PathExpr".equals(kind)) {
@@ -211,6 +243,7 @@ public final class XPathAstExtractor {
         return tokenValue.toString();
     }
 
+    /** Keeps Saxon's item type when it is available and useful for comparison. */
     private String extractValueType(Object expression) throws Exception {
         Object itemType = invokeNoArgIfPresent(expression, "getItemType");
         if (itemType != null) {
@@ -219,6 +252,7 @@ public final class XPathAstExtractor {
         return null;
     }
 
+    /** Reads literal values from Saxon literal-like expression nodes. */
     private String extractLiteralValue(Object expression) throws Exception {
         Object grounded = invokeNoArgIfPresent(expression, "getGroundedValue");
         if (grounded != null) {
@@ -231,6 +265,9 @@ public final class XPathAstExtractor {
         return null;
     }
 
+    /**
+     * Finds child expressions through Saxon's public expression/operand APIs.
+     */
     private List<Object> childExpressions(Object expression) throws Exception {
         List<Object> children = new ArrayList<>();
         Object operands = invokeNoArgIfPresent(expression, "operands");
@@ -266,6 +303,7 @@ public final class XPathAstExtractor {
         return children;
     }
 
+    /** Adds expression objects from direct values, iterables, or arrays. */
     private void addExpressionValues(List<Object> children, Object value) throws Exception {
         if (value == null) {
             return;
@@ -293,6 +331,7 @@ public final class XPathAstExtractor {
         }
     }
 
+    /** Checks whether a reflected value is a Saxon Expression instance. */
     private boolean isExpression(Object value) {
         for (Class<?> type = value.getClass(); type != null; type = type.getSuperclass()) {
             if ("net.sf.saxon.expr.Expression".equals(type.getName())) {
@@ -302,6 +341,7 @@ public final class XPathAstExtractor {
         return false;
     }
 
+    /** Invokes optional no-argument Saxon methods without depending on one exact API surface. */
     private Object invokeNoArgIfPresent(Object target, String methodName) throws Exception {
         try {
             Method method = target.getClass().getMethod(methodName);
@@ -313,6 +353,7 @@ public final class XPathAstExtractor {
         }
     }
 
+    /** Converts QName-like and display-name values into compact output names. */
     private String normalizeNamedValue(Object value) throws Exception {
         if (value == null) {
             return null;
@@ -334,6 +375,7 @@ public final class XPathAstExtractor {
         return normalizeNameString(value.toString());
     }
 
+    /** Filters out generic Saxon labels that do not identify the expression. */
     private boolean isUsefulName(String value) {
         if (value == null || value.isBlank()) {
             return false;
@@ -344,6 +386,7 @@ public final class XPathAstExtractor {
         };
     }
 
+    /** Removes parser-specific formatting and rejects names that are really expression snippets. */
     private String normalizeNameString(String value) {
         if (value == null) {
             return null;
@@ -364,6 +407,7 @@ public final class XPathAstExtractor {
         return normalized;
     }
 
+    /** Supplies simple fallback names for structural root nodes. */
     private String genericNameForKind(String kind) {
         return switch (kind) {
             case "Root" -> "root";
@@ -372,6 +416,7 @@ public final class XPathAstExtractor {
         };
     }
 
+    /** Translates Saxon operator codes/classes into stable string labels. */
     private String mapOperatorCode(int code, String simpleName) {
         if (simpleName.toLowerCase(Locale.ROOT).contains("union")) {
             return "|";
@@ -391,6 +436,7 @@ public final class XPathAstExtractor {
         return String.valueOf(code);
     }
 
+    /** Unwraps reflection exceptions so parse errors point at the real cause. */
     private Exception unwrap(InvocationTargetException e) {
         Throwable cause = e.getCause();
         if (cause instanceof Exception exception) {
@@ -399,10 +445,12 @@ public final class XPathAstExtractor {
         return new Exception(cause == null ? e.getMessage() : cause.getMessage(), cause);
     }
 
+    /** Treats missing XPath values as empty strings so errors are recorded per row. */
     private String stringValue(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 
+    /** Formats the deepest exception cause for parseError output. */
     private String rootCauseMessage(Throwable throwable) {
         Throwable current = throwable;
         while (current.getCause() != null) {

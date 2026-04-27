@@ -12,6 +12,10 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Command-line entry point for converting JSONL rows with XPath strings into
+ * JSONL rows with normalized ASTs.
+ */
 public final class Main {
     private Main() {
     }
@@ -26,6 +30,8 @@ public final class Main {
         ObjectMapper mapper = new ObjectMapper();
         XPathAstExtractor extractor = new XPathAstExtractor();
 
+        // Stream the file row-by-row so large experiment outputs do not need to
+        // be loaded into memory at once.
         try (BufferedReader reader = Files.newBufferedReader(input, StandardCharsets.UTF_8);
              BufferedWriter writer = Files.newBufferedWriter(output, StandardCharsets.UTF_8)) {
             String line;
@@ -44,6 +50,10 @@ public final class Main {
         System.out.println("Wrote AST records to " + output);
     }
 
+    /**
+     * Builds the output row in a stable order so downstream analysis scripts can
+     * consume predictable JSONL records.
+     */
     private static Map<String, Object> toOutputRow(AstRecord record) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("ruleKey", record.ruleKey);
@@ -63,6 +73,9 @@ public final class Main {
         return value;
     }
 
+    /**
+     * Parses simple "--key value" argument pairs used by the pipeline scripts.
+     */
     private static Map<String, String> parseArgs(String[] args) {
         Map<String, String> parsed = new LinkedHashMap<>();
         for (int i = 0; i < args.length; i += 2) {

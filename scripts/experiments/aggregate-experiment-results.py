@@ -2,6 +2,13 @@ import argparse
 import json
 from pathlib import Path
 
+"""Flatten per-run evaluation outputs into one compact experiment JSONL file.
+
+Each validation run writes its own evaluation/results.jsonl under the experiment
+tree. This script attaches the run-spec metadata to every row so later summary
+scripts can group by target, model, prompt style, temperature, and run count.
+"""
+
 OMIT_ROW_FIELDS = {
     "rulesetPath",
     "reportPath",
@@ -16,12 +23,14 @@ OMIT_SPEC_FIELDS = {
 
 
 def iter_result_files(experiment_root: Path):
+    """Yield validation result files from run evaluation directories."""
     for path in sorted(experiment_root.rglob("results.jsonl")):
         if "evaluation" in path.parts:
             yield path
 
 
 def load_run_spec(results_path: Path) -> dict:
+    """Load the run-spec.json that belongs to an evaluation/results.jsonl file."""
     run_spec = results_path.parent.parent / "run-spec.json"
     if not run_spec.exists():
         return {}
@@ -40,6 +49,7 @@ def compact_result_row(row: dict) -> dict:
 
 
 def main() -> int:
+    """Write one merged JSONL file containing all evaluation rows in an experiment."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment-root", required=True,
                         help="Root folder under out/experiments/<experimentName>")
@@ -60,6 +70,8 @@ def main() -> int:
                     if not line:
                         continue
                     row = compact_result_row(json.loads(line))
+                    # Keep the grouping dimensions first, then append the
+                    # compacted per-rule validation result.
                     merged = {
                         "runName": run_spec.get("runName"),
                         "inputRules": run_spec.get("inputRules"),

@@ -9,10 +9,18 @@ import net.sf.saxon.value.BooleanValue;
 import net.sf.saxon.value.SequenceType;
 import net.sf.saxon.value.StringValue;
 
+/**
+ * Registers PMD-specific XPath extension functions with Saxon.
+ *
+ * <p>The AST parser only needs expressions to parse, not to evaluate against a
+ * PMD Java AST. These lightweight stubs provide the function signatures Saxon
+ * requires so rules using pmd-java:* functions can still be parsed.</p>
+ */
 public final class PmdExtensionFunctions {
     private PmdExtensionFunctions() {
     }
 
+    /** Adds the PMD Java extension functions used by the rule catalog. */
     public static void registerAll(net.sf.saxon.Configuration configuration) {
         configuration.registerExtensionFunction(booleanFunction("urn:pmd-java", "typeIs", 1, 1));
         configuration.registerExtensionFunction(booleanFunction("urn:pmd-java", "typeIsExactly", 1, 1));
@@ -22,6 +30,10 @@ public final class PmdExtensionFunctions {
         configuration.registerExtensionFunction(stringFunction("urn:pmd-java", "modifiers", 0, 0));
     }
 
+    /**
+     * Creates a boolean-valued function definition with permissive argument
+     * types. The return value is irrelevant because expressions are not run.
+     */
     private static ExtensionFunctionDefinition booleanFunction(String uri, String localName, int minArity, int maxArity) {
         return new ExtensionFunctionDefinition() {
             @Override
@@ -65,6 +77,10 @@ public final class PmdExtensionFunctions {
         };
     }
 
+    /**
+     * Creates a string-valued function definition for PMD helpers such as
+     * pmd-java:modifiers().
+     */
     private static ExtensionFunctionDefinition stringFunction(String uri, String localName, int minArity, int maxArity) {
         return new ExtensionFunctionDefinition() {
             @Override

@@ -6,6 +6,14 @@ import sys
 from itertools import product
 from pathlib import Path
 
+"""Expand and run an LLM XPath generation experiment matrix.
+
+The matrix config defines runs across models, targets, prompt styles,
+temperatures, and repeats. This driver creates a reproducible output directory
+for each condition, launches generation, and then validates generated XPath
+rules with the PMD validation script.
+"""
+
 
 def sanitize(value: str) -> str:
     """Convert a run parameter into a filesystem-safe path segment."""
@@ -63,6 +71,8 @@ def build_run_specs(config: dict) -> list[dict]:
         if runCount < 1:
             raise ValueError(f"Run '{run['name']}' must have runCount >= 1")
 
+        # Cartesian-product expansion makes each generated spec a single,
+        # reproducible condition with one model/target/prompt/temperature/repeat.
         for model, target, prompt_style, temperature, repeat_index in product(
             run["models"], targets, prompt_styles, temperatures, range(1, runCount + 1)
         ):
@@ -146,6 +156,8 @@ def main() -> int:
         ensure_dir(generation_dir)
         ensure_dir(evaluation_dir)
 
+        # Store resolved absolute paths in run-spec.json so later analysis can
+        # locate generated files, reports, and the exact target used.
         resolved_spec = {
             **spec,
             "index": index,
@@ -167,6 +179,8 @@ def main() -> int:
 
         if not args.skip_generation:
             if args.force or not file_has_content(generated_jsonl):
+                # Generation is a Python script so it uses the same interpreter
+                # that launched this matrix driver.
                 command = [
                     sys.executable,
                     str(generator_script),
@@ -193,6 +207,8 @@ def main() -> int:
 
         if not args.skip_validation:
             if args.force or not file_has_content(validation_results):
+                # Validation runs through PowerShell because the PMD wrapper is
+                # implemented as a repository-local .ps1 script.
                 command = [
                     powershell_executable(),
                     "-ExecutionPolicy",
