@@ -9,6 +9,13 @@ from pathlib import Path
 The input CSVs are produced by summarize-experiment-vs-ground-truth.py. The
 figure is intended for quick comparison of experiment conditions rather than
 for recomputing any metrics.
+
+Usage example:
+  python scripts/analysis/plot-aggregated-overview.py \
+    --syntax-summary out/analysis-summary/syntax_execution_summary.csv \
+    --behavior-summary out/analysis-summary/behavioral_agreement_summary.csv \
+    --behavior-per-rule out/analysis-summary/behavioral_agreement_per_rule.csv \
+    --out-figure out/analysis-summary/aggregated_overview.png
 """
 
 

@@ -7,6 +7,11 @@ from pathlib import Path
 Each validation run writes its own evaluation/results.jsonl under the experiment
 tree. This script attaches the run-spec metadata to every row so later summary
 scripts can group by target, model, prompt style, temperature, and run count.
+
+Usage example:
+  python scripts/experiments/aggregate-experiment-results.py \
+    --experiment-root out/experiments/alternative_model_testing \
+    --out out/experiments/alternative_model_testing/aggregated-results.jsonl
 """
 
 OMIT_ROW_FIELDS = {

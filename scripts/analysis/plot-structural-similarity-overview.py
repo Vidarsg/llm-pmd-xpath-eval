@@ -8,6 +8,12 @@ from pathlib import Path
 
 The script visualizes the CSV tables emitted by summarize-experiment-vs-ground-
 truth.py and focuses on comparable pairs where both XPath expressions parsed.
+
+Usage example:
+  python scripts/analysis/plot-structural-similarity-overview.py \
+    --structural-summary out/analysis-summary/structural_similarity_summary.csv \
+    --structural-per-rule out/analysis-summary/structural_similarity_per_rule.csv \
+    --out-figure out/analysis-summary/structural_similarity_overview.png
 """
 
 

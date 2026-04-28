@@ -8,6 +8,14 @@ whose implementation is XPath-based.
 Note:
 - "xpath" are also kept in "properties" (as in the source), but promoted to
   top-level fields for convenience.
+
+Usage example:
+  python scripts/catalog/extract-pmd-catalog.py \
+    --in C:/tools/pmd-bin-7.20.0/lib/category/java \
+    --out config/pmd-catalog.json \
+    --pmd-version 7.20.0 \
+    --java-version 21 \
+    --source pmd-java-7.20.0.jar
 """
 
 from __future__ import annotations

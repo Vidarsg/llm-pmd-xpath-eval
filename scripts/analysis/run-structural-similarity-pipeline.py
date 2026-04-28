@@ -8,6 +8,12 @@ from pathlib import Path
 This script glues together the Java/Saxon XPath AST parser and the Python
 similarity calculator. It supports a single generated/ground-truth pair or an
 entire experiment tree containing generation/**/generated.jsonl files.
+
+Usage example:
+  python scripts/analysis/run-structural-similarity-pipeline.py \
+    --experiment-root out/experiments/experiment \
+    --ground-truth-asts config/pmd-official-rule-asts.jsonl \
+    --catalog-path config/pmd-catalog.json
 """
 
 
@@ -49,7 +55,8 @@ def build_parser_if_needed(repo_root: Path, parser_jar: Path, skip_build: bool) 
     run_command(["mvn", "clean", "package"], parser_project)
 
     if not parser_jar.exists():
-        raise FileNotFoundError(f"Parser jar still not found after build: {parser_jar}")
+        raise FileNotFoundError(
+            f"Parser jar still not found after build: {parser_jar}")
 
 
 def parse_xpath_file(
@@ -133,12 +140,14 @@ def process_pair(
 
     # Ground-truth ASTs can be reused across many experiment runs, but generated
     # XPath files are parsed per run because they carry run metadata.
-    parse_xpath_file(repo_root, java_exe, parser_jar, llm_xpaths, llm_asts, force)
+    parse_xpath_file(repo_root, java_exe, parser_jar,
+                     llm_xpaths, llm_asts, force)
     if gt_asts_source is not None:
         gt_asts = gt_asts_source
     elif gt_xpaths is not None:
         gt_asts = out_dir / "gt-xpath-asts.jsonl"
-        parse_xpath_file(repo_root, java_exe, parser_jar, gt_xpaths, gt_asts, force)
+        parse_xpath_file(repo_root, java_exe, parser_jar,
+                         gt_xpaths, gt_asts, force)
     else:
         raise ValueError("Either gt_xpaths or gt_asts_source must be provided")
     compute_similarity(
@@ -170,44 +179,63 @@ def inferred_structural_dir(generated_jsonl: Path) -> Path:
 def main() -> int:
     """Drive AST parsing and structural similarity computation for one file pair or a whole experiment tree."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--llm-xpaths", help="Single LLM-generated XPath JSONL input")
-    parser.add_argument("--ground-truth-xpaths", help="Ground-truth XPath JSONL input")
-    parser.add_argument("--ground-truth-asts", help="Precomputed ground-truth AST JSONL input")
-    parser.add_argument("--out-dir", help="Output directory for single-pair mode")
-    parser.add_argument("--experiment-root", help="Experiment root to scan for generation/**/generated.jsonl files")
-    parser.add_argument("--parser-jar", help="Path to the shaded Java AST parser jar")
-    parser.add_argument("--similarity-script", default="scripts/analysis/compute-xpath-structural-similarity.py", help="Path to the Python similarity script")
-    parser.add_argument("--catalog-path", default="config/pmd-catalog.json", help="PMD catalog JSON used for fallback rule-key mapping")
+    parser.add_argument(
+        "--llm-xpaths", help="Single LLM-generated XPath JSONL input")
+    parser.add_argument("--ground-truth-xpaths",
+                        help="Ground-truth XPath JSONL input")
+    parser.add_argument("--ground-truth-asts",
+                        help="Precomputed ground-truth AST JSONL input")
+    parser.add_argument(
+        "--out-dir", help="Output directory for single-pair mode")
+    parser.add_argument(
+        "--experiment-root", help="Experiment root to scan for generation/**/generated.jsonl files")
+    parser.add_argument(
+        "--parser-jar", help="Path to the shaded Java AST parser jar")
+    parser.add_argument("--similarity-script", default="scripts/analysis/compute-xpath-structural-similarity.py",
+                        help="Path to the Python similarity script")
+    parser.add_argument("--catalog-path", default="config/pmd-catalog.json",
+                        help="PMD catalog JSON used for fallback rule-key mapping")
     parser.add_argument("--java-exe", default="java", help="Java executable")
-    parser.add_argument("--python-exe", default=sys.executable, help="Python executable")
-    parser.add_argument("--skip-build", action="store_true", help="Do not try to build the parser jar if it is missing")
-    parser.add_argument("--force", action="store_true", help="Re-run stages even if outputs already exist")
+    parser.add_argument(
+        "--python-exe", default=sys.executable, help="Python executable")
+    parser.add_argument("--skip-build", action="store_true",
+                        help="Do not try to build the parser jar if it is missing")
+    parser.add_argument("--force", action="store_true",
+                        help="Re-run stages even if outputs already exist")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent.parent
-    parser_jar = Path(args.parser_jar).resolve() if args.parser_jar else default_parser_jar(repo_root)
+    parser_jar = Path(args.parser_jar).resolve(
+    ) if args.parser_jar else default_parser_jar(repo_root)
     similarity_script = (repo_root / args.similarity_script).resolve()
     catalog_path = (repo_root / args.catalog_path).resolve()
 
     build_parser_if_needed(repo_root, parser_jar, args.skip_build)
 
     if args.ground_truth_xpaths and args.ground_truth_asts:
-        raise ValueError("Use either --ground-truth-xpaths or --ground-truth-asts, not both")
-    gt_xpaths_arg = Path(args.ground_truth_xpaths).resolve() if args.ground_truth_xpaths else None
-    gt_asts_arg = Path(args.ground_truth_asts).resolve() if args.ground_truth_asts else None
+        raise ValueError(
+            "Use either --ground-truth-xpaths or --ground-truth-asts, not both")
+    gt_xpaths_arg = Path(args.ground_truth_xpaths).resolve(
+    ) if args.ground_truth_xpaths else None
+    gt_asts_arg = Path(args.ground_truth_asts).resolve(
+    ) if args.ground_truth_asts else None
 
-    single_mode = bool(args.llm_xpaths or args.ground_truth_xpaths or args.out_dir)
+    single_mode = bool(
+        args.llm_xpaths or args.ground_truth_xpaths or args.out_dir)
     batch_mode = bool(args.experiment_root)
 
     # Keep the modes mutually exclusive so output layout is predictable.
     if single_mode and batch_mode:
-        raise ValueError("Use either single-pair mode (--llm-xpaths/--ground-truth-xpaths/--out-dir) or --experiment-root, not both")
+        raise ValueError(
+            "Use either single-pair mode (--llm-xpaths/--ground-truth-xpaths/--out-dir) or --experiment-root, not both")
 
     if single_mode:
         if not args.llm_xpaths or not args.out_dir:
-            raise ValueError("Single-pair mode requires --llm-xpaths and --out-dir")
+            raise ValueError(
+                "Single-pair mode requires --llm-xpaths and --out-dir")
         if gt_xpaths_arg is None and gt_asts_arg is None:
-            raise ValueError("Single-pair mode requires either --ground-truth-xpaths or --ground-truth-asts")
+            raise ValueError(
+                "Single-pair mode requires either --ground-truth-xpaths or --ground-truth-asts")
 
         process_pair(
             repo_root,
@@ -222,18 +250,22 @@ def main() -> int:
             out_dir=Path(args.out_dir).resolve(),
             force=args.force,
         )
-        print(f"Structural analysis written under: {Path(args.out_dir).resolve()}")
+        print(
+            f"Structural analysis written under: {Path(args.out_dir).resolve()}")
         return 0
 
     if batch_mode:
         experiment_root = Path(args.experiment_root).resolve()
         generated_files = find_generated_jsonl_files(experiment_root)
         if not generated_files:
-            raise FileNotFoundError(f"No generated.jsonl files found under {experiment_root}")
+            raise FileNotFoundError(
+                f"No generated.jsonl files found under {experiment_root}")
         if gt_xpaths_arg is None and gt_asts_arg is None:
-            raise ValueError("Batch mode requires either --ground-truth-xpaths or --ground-truth-asts")
+            raise ValueError(
+                "Batch mode requires either --ground-truth-xpaths or --ground-truth-asts")
 
-        print(f"Found {len(generated_files)} generated JSONL file(s) under {experiment_root}")
+        print(
+            f"Found {len(generated_files)} generated JSONL file(s) under {experiment_root}")
         for index, generated_jsonl in enumerate(generated_files, start=1):
             structural_dir = inferred_structural_dir(generated_jsonl)
             print(f"[{index}/{len(generated_files)}] {generated_jsonl}")
@@ -251,7 +283,8 @@ def main() -> int:
                 force=args.force,
             )
 
-        print(f"Structural analysis written under experiment root: {experiment_root}")
+        print(
+            f"Structural analysis written under experiment root: {experiment_root}")
         return 0
 
     raise ValueError("Specify either single-pair mode or --experiment-root")

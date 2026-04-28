@@ -8,6 +8,7 @@
 #     --base-url <LLM API base URL> --model <model identifier> --max-tokens <maximum tokens in response> --temperature <sampling temperature>
 
 import argparse
+from datetime import datetime, timezone
 import json
 import os
 import re
@@ -33,18 +34,13 @@ Technical context:
   - pmd-java:hasAnnotation('AnnotationName')
   - pmd-java:modifiers()
 
-Generation procedure:
-1. Identify the main violating AST construct.
-2. Choose the narrowest stable AST node as the anchor.
-3. Add only the predicates needed to express the violation.
-4. If the rule requires type or signature reasoning, use PMD Java functions only when clearly justified.
-5. If uncertain about an AST detail, simplify instead of guessing.
-
 Hard requirements:
 - Prefer a conservative valid XPath over an ambitious fragile XPath.
 - Do not invent PMD functions or AST node names.
 - Do not use unsupported syntax.
 - Output no explanation, no steps, no markdown, no XML wrapper, no comments.
+- Do not output <think> tags or reasoning text.
+- If you reason internally, do not reveal it. Output only the final raw XPath.
 - Return exactly one raw XPath expression and nothing else.
 
 Rule description:
@@ -68,18 +64,13 @@ Technical context:
   - pmd-java:hasAnnotation('AnnotationName')
   - pmd-java:modifiers()
 
-Generation procedure:
-1. Identify the main violating AST construct.
-2. Choose the narrowest stable AST node as the anchor.
-3. Add only the predicates needed to express the violation.
-4. If the rule requires type or signature reasoning, use PMD Java functions only when clearly justified.
-5. If uncertain about an AST detail, simplify instead of guessing.
-
 Hard requirements:
 - Prefer a conservative valid XPath over an ambitious fragile XPath.
 - Do not invent PMD functions or AST node names.
 - Do not use unsupported syntax.
 - Output no explanation, no steps, no markdown, no XML wrapper, no comments.
+- Do not output <think> tags or reasoning text.
+- If you reason internally, do not reveal it. Output only the final raw XPath.
 - Return exactly one raw XPath expression and nothing else.
 
 Examples:
@@ -121,6 +112,8 @@ Hard requirements:
 - Do not invent PMD functions or AST node names.
 - Do not use unsupported syntax.
 - Output no explanation, no steps, no markdown, no XML wrapper, no comments.
+- Do not output <think> tags or reasoning text.
+- If you reason internally, do not reveal it. Output only the final raw XPath.
 - Return exactly one raw XPath expression and nothing else.
 
 Rule description:
@@ -163,7 +156,8 @@ def load_catalog_examples(catalog_path: str) -> list[dict]:
     """Load PMD examples with description/xpath pairs usable as few-shot examples."""
     if catalog_path.lower().endswith(".jsonl"):
         descriptions = load_jsonl_records(catalog_path)
-        xpaths_path = re.sub(r"rule-descriptions\.jsonl$", "rule-xpaths.jsonl", catalog_path)
+        xpaths_path = re.sub(r"rule-descriptions\.jsonl$",
+                             "rule-xpaths.jsonl", catalog_path)
         if xpaths_path == catalog_path or not os.path.exists(xpaths_path):
             raise FileNotFoundError(
                 f"Could not infer matching XPath JSONL file for few-shot examples from {catalog_path}"
@@ -334,6 +328,76 @@ def extract_content(api_format: str, data: dict) -> str | None:
     return content
 
 
+def parse_rate_limit_reset(response: requests.Response) -> float | None:
+    """Return seconds to wait for a 429 response, if the API exposes a reset time."""
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return max(0.0, float(retry_after))
+        except ValueError:
+            pass
+
+    try:
+        message = response.json().get("error", {}).get("message", "")
+    except ValueError:
+        message = response.text
+
+    match = re.search(
+        r"Limit resets at:\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC",
+        message,
+    )
+    if not match:
+        return None
+
+    reset_at = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    return max(0.0, (reset_at - datetime.now(timezone.utc)).total_seconds())
+
+
+def post_with_retries(url: str, headers: dict, payload: dict, rule_key, args) -> requests.Response:
+    """POST to the LLM API, waiting through rate limits and transient failures."""
+    for attempt in range(1, args.max_retries + 2):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=args.timeout)
+        except requests.exceptions.ReadTimeout:
+            if attempt > args.max_retries:
+                raise
+            wait_seconds = min(args.retry_max_wait, args.retry_base_wait * attempt)
+            print(
+                f"Read timeout for ruleKey={rule_key}; retrying in {wait_seconds:.1f}s "
+                f"({attempt}/{args.max_retries})",
+                file=sys.stderr,
+            )
+            time.sleep(wait_seconds)
+            continue
+
+        if response.status_code == 429 and attempt <= args.max_retries:
+            wait_seconds = parse_rate_limit_reset(response)
+            if wait_seconds is None:
+                wait_seconds = min(args.retry_max_wait, args.retry_base_wait * attempt)
+            wait_seconds += args.rate_limit_buffer
+            print(
+                f"HTTP 429 for ruleKey={rule_key}; waiting {wait_seconds:.1f}s before retry "
+                f"({attempt}/{args.max_retries})",
+                file=sys.stderr,
+            )
+            time.sleep(wait_seconds)
+            continue
+
+        if response.status_code in {500, 502, 503, 504} and attempt <= args.max_retries:
+            wait_seconds = min(args.retry_max_wait, args.retry_base_wait * attempt)
+            print(
+                f"HTTP {response.status_code} for ruleKey={rule_key}; retrying in {wait_seconds:.1f}s "
+                f"({attempt}/{args.max_retries})",
+                file=sys.stderr,
+            )
+            time.sleep(wait_seconds)
+            continue
+
+        return response
+
+    raise RuntimeError("unreachable retry state")
+
+
 def resolve_output_path(output_file: str, prompt_style: str) -> str:
     """Place outputs under a prompt-style subfolder when writing into llm-output."""
     output_dir = os.path.dirname(output_file)
@@ -379,6 +443,16 @@ def main() -> int:
                     help="Number of retrieved few-shot examples to inject for few-shot prompting")
     ap.add_argument("--api-key", default="API_KEY",
                     help="Environment variable name containing API key")
+    ap.add_argument("--timeout", type=int, default=300,
+                    help="Per-request timeout in seconds")
+    ap.add_argument("--max-retries", type=int, default=5,
+                    help="Maximum retries for rate limits, timeouts, and transient server errors")
+    ap.add_argument("--retry-base-wait", type=float, default=10.0,
+                    help="Base wait in seconds for retry backoff when no reset time is available")
+    ap.add_argument("--retry-max-wait", type=float, default=300.0,
+                    help="Maximum wait in seconds for retry backoff when no reset time is available")
+    ap.add_argument("--rate-limit-buffer", type=float, default=5.0,
+                    help="Extra seconds to wait after a reported rate-limit reset time")
     args = ap.parse_args()
     args.output_file = resolve_output_path(args.output_file, args.prompt_style)
     if args.omit_temperature:
@@ -428,7 +502,8 @@ def main() -> int:
                 retrieved_examples = select_retrieved_examples(
                     desc, catalog_rules, args.few_shot_count, excluded_ids)
                 example_labels = [
-                    str(example.get("catalogId") or example.get("id") or "<missing-id>")
+                    str(example.get("catalogId")
+                        or example.get("id") or "<missing-id>")
                     for example in retrieved_examples
                 ]
                 print(
@@ -445,7 +520,7 @@ def main() -> int:
             url = args.base_url.rstrip("/") + endpoint_path
 
             # Send the request to the LLM API
-            r = requests.post(url, headers=headers, json=payload, timeout=300)
+            r = post_with_retries(url, headers, payload, rule_key, args)
             if not r.ok:
                 print(
                     f"HTTP {r.status_code} for ruleKey = {rule_key}", file=sys.stderr)

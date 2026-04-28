@@ -8,6 +8,13 @@ from pathlib import Path
 The Java parser emits a deliberately small AST schema. This script turns those
 trees into comparable feature sets and writes one similarity row per generated
 rule, paired against its ground-truth rule.
+
+Usage example:
+  python scripts/analysis/compute-xpath-structural-similarity.py \
+    --llm-asts out/experiments/experiment/run/structural/llm-xpath-asts.jsonl \
+    --ground-truth-asts config/pmd-official-rule-asts.jsonl \
+    --catalog-path config/pmd-catalog.json \
+    --out out/experiments/experiment/run/structural/structural-similarity.jsonl
 """
 
 
@@ -61,7 +68,8 @@ def walk_ast(node: dict, parent_label: str | None, depth: int, features: dict) -
 
     features["nodeLabels"][label] += 1
     features["scalar"]["node_count"] += 1
-    features["scalar"]["max_depth"] = max(features["scalar"]["max_depth"], depth)
+    features["scalar"]["max_depth"] = max(
+        features["scalar"]["max_depth"], depth)
 
     kind = str(node.get("kind") or "")
     operator = str(node.get("operator") or "")
@@ -110,7 +118,8 @@ def weighted_jaccard(left: Counter, right: Counter) -> float:
     if not keys:
         return 1.0
 
-    intersection = sum(min(left.get(key, 0), right.get(key, 0)) for key in keys)
+    intersection = sum(min(left.get(key, 0), right.get(key, 0))
+                       for key in keys)
     union = sum(max(left.get(key, 0), right.get(key, 0)) for key in keys)
     if union == 0:
         return 1.0
@@ -138,9 +147,12 @@ def compute_similarity(left_ast: dict, right_ast: dict) -> dict:
 
     # Each component captures a different aspect of structure: vocabulary,
     # topology, and coarse size/shape. The final score weighs them equally.
-    node_sim = weighted_jaccard(left_features["nodeLabels"], right_features["nodeLabels"])
-    edge_sim = weighted_jaccard(left_features["edgeLabels"], right_features["edgeLabels"])
-    scalar_sim = scalar_similarity(left_features["scalar"], right_features["scalar"])
+    node_sim = weighted_jaccard(
+        left_features["nodeLabels"], right_features["nodeLabels"])
+    edge_sim = weighted_jaccard(
+        left_features["edgeLabels"], right_features["edgeLabels"])
+    scalar_sim = scalar_similarity(
+        left_features["scalar"], right_features["scalar"])
     overall = (node_sim + edge_sim + scalar_sim) / 3.0
 
     return {
@@ -196,19 +208,25 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 def main() -> int:
     """Load two AST JSONL files, pair their rows, and write similarity results."""
     ap = argparse.ArgumentParser()
-    ap.add_argument("--llm-asts", required=True, help="JSONL file with normalized ASTs for LLM-generated XPath rules")
-    ap.add_argument("--ground-truth-asts", required=True, help="JSONL file with normalized ASTs for ground-truth XPath rules")
-    ap.add_argument("--catalog-path", default="config/pmd-catalog.json", help="PMD catalog used to map numeric LLM rule keys to PMD ids")
-    ap.add_argument("--out", required=True, help="Output JSONL file for structural similarity rows")
+    ap.add_argument("--llm-asts", required=True,
+                    help="JSONL file with normalized ASTs for LLM-generated XPath rules")
+    ap.add_argument("--ground-truth-asts", required=True,
+                    help="JSONL file with normalized ASTs for ground-truth XPath rules")
+    ap.add_argument("--catalog-path", default="config/pmd-catalog.json",
+                    help="PMD catalog used to map numeric LLM rule keys to PMD ids")
+    ap.add_argument("--out", required=True,
+                    help="Output JSONL file for structural similarity rows")
     args = ap.parse_args()
 
     catalog_index = load_catalog_rule_order(Path(args.catalog_path))
     llm_rows = read_json_records(Path(args.llm_asts))
-    gt_rows = {str(row["ruleKey"]): row for row in read_json_records(Path(args.ground_truth_asts))}
+    gt_rows = {str(row["ruleKey"]): row for row in read_json_records(
+        Path(args.ground_truth_asts))}
 
     output_rows = []
     for llm_row in llm_rows:
-        gt_rule_key = pair_ground_truth_rule_key(llm_row, gt_rows, catalog_index)
+        gt_rule_key = pair_ground_truth_rule_key(
+            llm_row, gt_rows, catalog_index)
         gt_row = gt_rows.get(gt_rule_key)
 
         # Keep a row even when comparison is impossible so parse failures and

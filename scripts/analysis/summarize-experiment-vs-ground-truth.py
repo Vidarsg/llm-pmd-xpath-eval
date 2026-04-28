@@ -10,6 +10,14 @@ from pathlib import Path
 The script combines validation outputs, PMD JSON reports, catalog metadata, and
 optional structural-similarity rows into CSV/Markdown tables suitable for
 analysis and thesis reporting.
+
+Usage example:
+  python scripts/analysis/summarize-experiment-vs-ground-truth.py \
+    --aggregated-results out/experiments/experiment/aggregated-results.jsonl \
+    --experiment-root out/experiments/experiment \
+    --ground-truth-results out/catalog-runs/catalog-run/results.jsonl \
+    --catalog-path config/pmd-catalog.json \
+    --out-dir out/analysis-summary
 """
 
 
@@ -73,7 +81,8 @@ def load_run_report_dirs(experiment_root: Path) -> dict[tuple[str, str, str, str
     report_dirs = {}
     for spec_path in experiment_root.rglob("run-spec.json"):
         spec = json.loads(spec_path.read_text(encoding="utf-8-sig"))
-        report_dirs[spec_key(spec)] = spec_path.parent / "evaluation" / "reports"
+        report_dirs[spec_key(spec)] = spec_path.parent / \
+            "evaluation" / "reports"
     return report_dirs
 
 
@@ -245,7 +254,8 @@ def write_markdown_table(path: Path, title: str, rows: list[dict], fieldnames: l
         f.write("| " + " | ".join(fieldnames) + " |\n")
         f.write("| " + " | ".join("---" for _ in fieldnames) + " |\n")
         for row in rows:
-            f.write("| " + " | ".join(str(row.get(name, "")) for name in fieldnames) + " |\n")
+            f.write("| " + " | ".join(str(row.get(name, ""))
+                    for name in fieldnames) + " |\n")
 
 
 def find_associated_run_spec(structural_results_path: Path, experiment_root: Path) -> dict | None:
@@ -282,7 +292,8 @@ def load_structural_rows(
         rows = read_json_records(structural_results_path)
         return rows, structural_results_path.stem
 
-    structural_files = sorted(experiment_root.rglob("structural-similarity.jsonl"))
+    structural_files = sorted(
+        experiment_root.rglob("structural-similarity.jsonl"))
     rows = []
     for structural_file in structural_files:
         spec = find_associated_run_spec(structural_file, experiment_root)
@@ -308,18 +319,22 @@ def write_structural_similarity_summaries(
     label: str,
 ) -> None:
     """Summarize structural-similarity rows into overall, per-condition, and per-rule thesis tables."""
-    rows, inferred_label = load_structural_rows(structural_results_path, experiment_root)
+    rows, inferred_label = load_structural_rows(
+        structural_results_path, experiment_root)
     if not label:
         label = inferred_label
 
-    comparable_rows = [row for row in rows if row.get("structurallyComparable")]
+    comparable_rows = [row for row in rows if row.get(
+        "structurallyComparable")]
 
     # Overall rows capture the entire dataset; condition rows below split the
     # same metrics by target/model/prompt/temperature/run.
-    overall_scores = [float(row["overallStructuralSimilarity"]) for row in comparable_rows]
+    overall_scores = [float(row["overallStructuralSimilarity"])
+                      for row in comparable_rows]
     node_scores = [float(row["nodeLabelJaccard"]) for row in comparable_rows]
     edge_scores = [float(row["edgeLabelJaccard"]) for row in comparable_rows]
-    scalar_scores = [float(row["scalarFeatureSimilarity"]) for row in comparable_rows]
+    scalar_scores = [float(row["scalarFeatureSimilarity"])
+                     for row in comparable_rows]
 
     overall_summary_rows = [
         {
@@ -354,11 +369,16 @@ def write_structural_similarity_summaries(
     # Append one summary row per experimental condition so plotting scripts can
     # compare runs without re-reading the JSONL source.
     for key, condition_rows in sorted(grouped_rows.items()):
-        condition_comparable = [row for row in condition_rows if row.get("structurallyComparable")]
-        condition_overall = [float(row["overallStructuralSimilarity"]) for row in condition_comparable]
-        condition_node = [float(row["nodeLabelJaccard"]) for row in condition_comparable]
-        condition_edge = [float(row["edgeLabelJaccard"]) for row in condition_comparable]
-        condition_scalar = [float(row["scalarFeatureSimilarity"]) for row in condition_comparable]
+        condition_comparable = [
+            row for row in condition_rows if row.get("structurallyComparable")]
+        condition_overall = [float(row["overallStructuralSimilarity"])
+                             for row in condition_comparable]
+        condition_node = [float(row["nodeLabelJaccard"])
+                          for row in condition_comparable]
+        condition_edge = [float(row["edgeLabelJaccard"])
+                          for row in condition_comparable]
+        condition_scalar = [float(row["scalarFeatureSimilarity"])
+                            for row in condition_comparable]
         overall_summary_rows.append(
             {
                 "scope": "condition",
@@ -446,14 +466,16 @@ def write_structural_similarity_summaries(
         "comparisonError",
     ]
 
-    write_csv(out_dir / "structural_similarity_summary.csv", overall_summary_rows, overall_fields)
+    write_csv(out_dir / "structural_similarity_summary.csv",
+              overall_summary_rows, overall_fields)
     write_markdown_table(
         out_dir / "structural_similarity_summary.md",
         "# Structural Similarity Summary",
         overall_summary_rows,
         overall_fields,
     )
-    write_csv(out_dir / "structural_similarity_per_rule.csv", per_rule_rows, per_rule_fields)
+    write_csv(out_dir / "structural_similarity_per_rule.csv",
+              per_rule_rows, per_rule_fields)
     write_markdown_table(
         out_dir / "structural_similarity_per_rule.md",
         "# Structural Similarity Per Rule",
@@ -465,18 +487,26 @@ def write_structural_similarity_summaries(
 def main() -> int:
     """Load experiment outputs, compare them to ground truth, and emit thesis-ready summary tables."""
     ap = argparse.ArgumentParser()
-    ap.add_argument("--aggregated-results", required=True, help="Path to aggregated-results.jsonl")
-    ap.add_argument("--experiment-root", required=True, help="Experiment root containing run-spec.json files")
-    ap.add_argument("--ground-truth-results", required=True, help="Ground-truth results.jsonl path")
-    ap.add_argument("--catalog-path", default="config/pmd-catalog.json", help="PMD catalog JSON for numeric ruleKey to PMD id mapping")
-    ap.add_argument("--structural-results", help="Optional structural-similarity.jsonl path")
-    ap.add_argument("--structural-label", default="", help="Optional label shown in the structural similarity summary")
-    ap.add_argument("--out-dir", required=True, help="Directory for summary tables")
+    ap.add_argument("--aggregated-results", required=True,
+                    help="Path to aggregated-results.jsonl")
+    ap.add_argument("--experiment-root", required=True,
+                    help="Experiment root containing run-spec.json files")
+    ap.add_argument("--ground-truth-results", required=True,
+                    help="Ground-truth results.jsonl path")
+    ap.add_argument("--catalog-path", default="config/pmd-catalog.json",
+                    help="PMD catalog JSON for numeric ruleKey to PMD id mapping")
+    ap.add_argument("--structural-results",
+                    help="Optional structural-similarity.jsonl path")
+    ap.add_argument("--structural-label", default="",
+                    help="Optional label shown in the structural similarity summary")
+    ap.add_argument("--out-dir", required=True,
+                    help="Directory for summary tables")
     args = ap.parse_args()
 
     aggregated_rows = read_json_records(Path(args.aggregated_results))
     run_report_dirs = load_run_report_dirs(Path(args.experiment_root))
-    gt_index, gt_reports_dir = load_ground_truth_index(Path(args.ground_truth_results))
+    gt_index, gt_reports_dir = load_ground_truth_index(
+        Path(args.ground_truth_results))
     catalog_path = Path(args.catalog_path)
     catalog_index = load_catalog_rule_order(catalog_path)
     catalog_metadata = load_catalog_rule_metadata(catalog_path)
@@ -491,14 +521,19 @@ def main() -> int:
     for row in aggregated_rows:
         group = row_group_key(row)
         syntax_counters[group]["totalRules"] += 1
-        syntax_counters[group]["syntacticValid"] += int(bool(row.get("syntacticValid")))
-        syntax_counters[group]["hadConfigErrors"] += int(bool(row.get("hadConfigErrors")))
-        syntax_counters[group]["hadProcessingErrors"] += int(bool(row.get("hadProcessingErrors")))
+        syntax_counters[group]["syntacticValid"] += int(
+            bool(row.get("syntacticValid")))
+        syntax_counters[group]["hadConfigErrors"] += int(
+            bool(row.get("hadConfigErrors")))
+        syntax_counters[group]["hadProcessingErrors"] += int(
+            bool(row.get("hadProcessingErrors")))
         syntax_counters[group]["operationallyValid"] += int(
-            bool(row.get("syntacticValid")) and not bool(row.get("hadConfigErrors")) and not bool(row.get("hadProcessingErrors"))
+            bool(row.get("syntacticValid")) and not bool(
+                row.get("hadConfigErrors")) and not bool(row.get("hadProcessingErrors"))
         )
 
-        mapped_rule_id = catalog_index.get(int(row["ruleKey"])) if str(row["ruleKey"]).isdigit() else str(row["ruleKey"])
+        mapped_rule_id = catalog_index.get(int(row["ruleKey"])) if str(
+            row["ruleKey"]).isdigit() else str(row["ruleKey"])
         rule_metadata = catalog_metadata.get(str(mapped_rule_id), {})
         rule_category = str(rule_metadata.get("category", "Unknown"))
         gt_row = gt_index.get(str(mapped_rule_id))
@@ -544,8 +579,10 @@ def main() -> int:
             )
             continue
 
-        llm_report = parse_report_violations(llm_report_dir / f"{row['ruleKey']}.json", report_cache)
-        gt_report = parse_report_violations(gt_reports_dir / f"{mapped_rule_id}.json", report_cache)
+        llm_report = parse_report_violations(
+            llm_report_dir / f"{row['ruleKey']}.json", report_cache)
+        gt_report = parse_report_violations(
+            gt_reports_dir / f"{mapped_rule_id}.json", report_cache)
         match_type = classify_behavior(llm_report, gt_report)
         behavior_counters[group]["totalRules"] += 1
         behavior_counters[group][match_type] += 1
@@ -643,13 +680,19 @@ def main() -> int:
         "matchType",
     ]
 
-    write_csv(out_dir / "syntax_execution_summary.csv", syntax_rows, syntax_fields)
-    write_csv(out_dir / "behavioral_agreement_summary.csv", behavior_rows, behavior_fields)
-    write_csv(out_dir / "behavioral_agreement_per_rule.csv", behavior_per_rule_rows, behavior_per_rule_fields)
-    write_markdown_table(out_dir / "syntax_execution_summary.md", "# Syntax / Execution Summary", syntax_rows, syntax_fields)
-    write_markdown_table(out_dir / "behavioral_agreement_summary.md", "# Behavioral Agreement Summary", behavior_rows, behavior_fields)
+    write_csv(out_dir / "syntax_execution_summary.csv",
+              syntax_rows, syntax_fields)
+    write_csv(out_dir / "behavioral_agreement_summary.csv",
+              behavior_rows, behavior_fields)
+    write_csv(out_dir / "behavioral_agreement_per_rule.csv",
+              behavior_per_rule_rows, behavior_per_rule_fields)
+    write_markdown_table(out_dir / "syntax_execution_summary.md",
+                         "# Syntax / Execution Summary", syntax_rows, syntax_fields)
+    write_markdown_table(out_dir / "behavioral_agreement_summary.md",
+                         "# Behavioral Agreement Summary", behavior_rows, behavior_fields)
 
-    structural_results_path = Path(args.structural_results) if args.structural_results else None
+    structural_results_path = Path(
+        args.structural_results) if args.structural_results else None
     # Structural summaries are optional because older experiment runs may only
     # have syntax and behavioral validation artifacts.
     if structural_results_path is not None or any(Path(args.experiment_root).rglob("structural-similarity.jsonl")):
@@ -660,10 +703,13 @@ def main() -> int:
             args.structural_label,
         )
 
-    print(f"Wrote syntax summary to {out_dir / 'syntax_execution_summary.csv'}")
-    print(f"Wrote behavior summary to {out_dir / 'behavioral_agreement_summary.csv'}")
+    print(
+        f"Wrote syntax summary to {out_dir / 'syntax_execution_summary.csv'}")
+    print(
+        f"Wrote behavior summary to {out_dir / 'behavioral_agreement_summary.csv'}")
     if structural_results_path is not None or any(Path(args.experiment_root).rglob("structural-similarity.jsonl")):
-        print(f"Wrote structural summary to {out_dir / 'structural_similarity_summary.csv'}")
+        print(
+            f"Wrote structural summary to {out_dir / 'structural_similarity_summary.csv'}")
     return 0
 
 
