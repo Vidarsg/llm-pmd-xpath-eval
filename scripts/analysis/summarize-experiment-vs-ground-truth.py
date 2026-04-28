@@ -106,11 +106,24 @@ def parse_report_violations(report_path: Path, cache: dict[Path, dict]) -> dict:
             "hadConfigErrors": True,
             "hadProcessingErrors": True,
             "exists": False,
+            "parseError": "report file does not exist",
         }
         cache[report_path] = result
         return result
 
-    data = json.loads(report_path.read_text(encoding="utf-8-sig"))
+    try:
+        data = json.loads(report_path.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as exc:
+        result = {
+            "files": {},
+            "hadConfigErrors": False,
+            "hadProcessingErrors": True,
+            "exists": True,
+            "parseError": f"invalid JSON report: {exc}",
+        }
+        cache[report_path] = result
+        return result
+
     files = {}
     for file_entry in data.get("files", []):
         filename = normalize_path(file_entry["filename"])
@@ -133,6 +146,7 @@ def parse_report_violations(report_path: Path, cache: dict[Path, dict]) -> dict:
         "hadConfigErrors": bool((data.get("scriptDetectedConfigurationErrors") or {}).get("hadConfigErrors", False)),
         "hadProcessingErrors": bool((data.get("scriptDetectedProcessingErrors") or {}).get("hadProcessingErrors", False)),
         "exists": True,
+        "parseError": "",
     }
     cache[report_path] = result
     return result
