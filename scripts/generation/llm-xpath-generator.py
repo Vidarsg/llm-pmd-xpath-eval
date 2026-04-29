@@ -6,6 +6,8 @@
 #   set API_KEY=<personal api key>
 #   python .\scripts\generation\llm-xpath-generator.py --in <input JSONL file location> --out <output JSONL file location>
 #     --base-url <LLM API base URL> --model <model identifier> --max-tokens <maximum tokens in response> --temperature <sampling temperature>
+#   python .\scripts\generation\llm-xpath-generator.py --in config\pmd-official-rule-descriptions.jsonl --out out\llm-output\pilot.jsonl `
+#     --base-url https://llm.example.com --model vendor/model-name --prompt-style few-shot --max-rules 10
 
 import argparse
 from datetime import datetime, timezone
@@ -425,6 +427,8 @@ def main() -> int:
     ap.add_argument("--model", required=True, help="Model identifier")
     ap.add_argument("--max-tokens", type=int, default=1500,
                     help="Maximum tokens in response")
+    ap.add_argument("--max-rules", type=int, default=0,
+                    help="Maximum number of input rules to process; 0 means all rules")
     ap.add_argument("--temperature", type=float, default=0.7,
                     help="Sampling temperature (omit for models/endpoints that reject it)")
     ap.add_argument("--api-format", choices=("auto", "chat", "responses"), default="auto",
@@ -475,13 +479,17 @@ def main() -> int:
     # Open input and output files
     # Process each line of the input JSONL file (one rule per line)
     with open(args.input_file, "r", encoding="utf-8") as fin, open(args.output_file, "w", encoding="utf-8") as fout:
+        processed_rules = 0
         for line in fin:
             line = line.strip()
             if not line:
                 continue
+            if args.max_rules and processed_rules >= args.max_rules:
+                break
 
             # Parse the JSON record to extract ruleKey and description
             rec = json.loads(line)
+            processed_rules += 1
             rule_key = rec.get("ruleKey")
             desc = (rec.get("description") or "").strip()
             excluded_ids = {

@@ -150,6 +150,14 @@ def main() -> int:
         fig_width, 9), constrained_layout=True)
 
     ax = axes[0, 0]
+    ax.bar(np.arange(len(labels)), comparable_pct, color="#4c9f70")
+    ax.set_title("LLM-Generated Rules With Parsed XPath AST")
+    ax.set_ylabel("Percent")
+    ax.set_ylim(0, 100)
+    ax.set_xticks(np.arange(len(labels)))
+    ax.set_xticklabels(labels, rotation=35, ha="right")
+
+    ax = axes[0, 1]
     bp = ax.boxplot(
         overall_box_data,
         patch_artist=True,
@@ -164,14 +172,6 @@ def main() -> int:
     ax.set_ylabel("Overall structural similarity")
     ax.set_ylim(0, 1)
     ax.set_xticks(range(1, len(labels) + 1))
-    ax.set_xticklabels(labels, rotation=35, ha="right")
-
-    ax = axes[0, 1]
-    ax.bar(np.arange(len(labels)), comparable_pct, color="#4c9f70")
-    ax.set_title("Pairs Were Both XPath ASTs Parsed")
-    ax.set_ylabel("Percent")
-    ax.set_ylim(0, 100)
-    ax.set_xticks(np.arange(len(labels)))
     ax.set_xticklabels(labels, rotation=35, ha="right")
 
     ax = axes[1, 0]

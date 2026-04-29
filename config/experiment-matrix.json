@@ -1,29 +1,42 @@
 {
-  "experimentName": "test-experiment-0.7",
+  "experimentName": "test-experiment",
   "outputRoot": "out/experiments",
   "generatorScript": "scripts/generation/llm-xpath-generator.py",
   "validatorScript": "scripts/pmd/validate-llm-generated-xpaths.ps1",
   "runs": [
     {
-      "name": "gpt-oss-120b-0.7 on WebGoat",
+      "name": "model-testing",
       "inputRules": "config/pmd-official-rule-descriptions.jsonl",
       "targets": [
         "C:/users/vidar/desktop/WebGoat/src"
       ],
       "models": [
         {
-          "name": "openai/gpt-oss-120b",
+          "name": "google/gemma-4-31B-it",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "mistralai/Devstral-Small-2-24B-Instruct-2512",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "Qwen/Qwen3.6-27B-FP8",
           "baseUrl": "https://llm.hpc.ntnu.no/",
           "apiKeyEnv": "API_KEY"
         }
       ],
       "promptStyles": [
+        "zero-shot",
         "few-shot"
       ],
       "temperatures": [
+        0.0,
         0.7
       ],
       "runCount": 2,
+      "maxRules": 10,
       "maxTokens": 1500
     }
   ]

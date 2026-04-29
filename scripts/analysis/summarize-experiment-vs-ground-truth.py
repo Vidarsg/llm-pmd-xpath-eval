@@ -191,6 +191,10 @@ def classify_behavior(llm_report: dict, gt_report: dict) -> str:
 
     if not llm_files and not gt_files:
         return "both-empty"
+    if not llm_files:
+        return "gt-only"
+    if not gt_files:
+        return "llm-only"
 
     # Exact is strict span equality; overlap and file-level progressively relax
     # the comparison while still requiring the same affected files.
@@ -202,7 +206,21 @@ def classify_behavior(llm_report: dict, gt_report: dict) -> str:
             return "overlap"
         return "file-level"
 
-    return "none"
+    llm_file_set = set(llm_files.keys())
+    gt_file_set = set(gt_files.keys())
+    common_files = llm_file_set & gt_file_set
+    if not common_files:
+        return "different-files"
+    if gt_file_set < llm_file_set:
+        return "llm-superset"
+    if llm_file_set < gt_file_set:
+        return "gt-superset"
+    return "partial-file-overlap"
+
+
+def report_finding_count(report: dict) -> int:
+    """Count violation spans across all files in a parsed PMD JSON report."""
+    return sum(len(spans) for spans in report.get("files", {}).values())
 
 
 def row_group_key(row: dict) -> tuple[str, str, str, str, str]:
@@ -566,6 +584,8 @@ def main() -> int:
                     "ruleKey": row.get("ruleKey"),
                     "catalogId": mapped_rule_id,
                     "category": rule_category,
+                    "llmFindingCount": "",
+                    "groundTruthFindingCount": "",
                     "matchType": "non-comparable",
                 }
             )
@@ -588,6 +608,8 @@ def main() -> int:
                     "ruleKey": row.get("ruleKey"),
                     "catalogId": mapped_rule_id,
                     "category": rule_category,
+                    "llmFindingCount": "",
+                    "groundTruthFindingCount": "",
                     "matchType": "non-comparable",
                 }
             )
@@ -598,6 +620,8 @@ def main() -> int:
         gt_report = parse_report_violations(
             gt_reports_dir / f"{mapped_rule_id}.json", report_cache)
         match_type = classify_behavior(llm_report, gt_report)
+        llm_finding_count = report_finding_count(llm_report)
+        gt_finding_count = report_finding_count(gt_report)
         behavior_counters[group]["totalRules"] += 1
         behavior_counters[group][match_type] += 1
         behavior_per_rule_rows.append(
@@ -610,6 +634,8 @@ def main() -> int:
                 "ruleKey": row.get("ruleKey"),
                 "catalogId": mapped_rule_id,
                 "category": rule_category,
+                "llmFindingCount": llm_finding_count,
+                "groundTruthFindingCount": gt_finding_count,
                 "matchType": match_type,
             }
         )
@@ -640,8 +666,18 @@ def main() -> int:
     behavior_rows = []
     # Behavioral categories are mutually exclusive, so each count contributes to
     # one percentage column in the summary table.
+    no_match_types = [
+        "none",
+        "gt-only",
+        "llm-only",
+        "different-files",
+        "llm-superset",
+        "gt-superset",
+        "partial-file-overlap",
+    ]
     for group, counts in sorted(behavior_counters.items()):
         total = counts["totalRules"]
+        no_match_count = sum(counts[match_type] for match_type in no_match_types)
         behavior_rows.append(
             {
                 "target": group[0],
@@ -658,8 +694,20 @@ def main() -> int:
                 "fileLevelPct": percent(counts["file-level"], total),
                 "bothEmptyCount": counts["both-empty"],
                 "bothEmptyPct": percent(counts["both-empty"], total),
-                "noMatchCount": counts["none"],
-                "noMatchPct": percent(counts["none"], total),
+                "gtOnlyCount": counts["gt-only"],
+                "gtOnlyPct": percent(counts["gt-only"], total),
+                "llmOnlyCount": counts["llm-only"],
+                "llmOnlyPct": percent(counts["llm-only"], total),
+                "differentFilesCount": counts["different-files"],
+                "differentFilesPct": percent(counts["different-files"], total),
+                "llmSupersetCount": counts["llm-superset"],
+                "llmSupersetPct": percent(counts["llm-superset"], total),
+                "gtSupersetCount": counts["gt-superset"],
+                "gtSupersetPct": percent(counts["gt-superset"], total),
+                "partialFileOverlapCount": counts["partial-file-overlap"],
+                "partialFileOverlapPct": percent(counts["partial-file-overlap"], total),
+                "noMatchCount": no_match_count,
+                "noMatchPct": percent(no_match_count, total),
                 "nonComparableCount": counts["non-comparable"],
                 "nonComparablePct": percent(counts["non-comparable"], total),
             }
@@ -679,6 +727,12 @@ def main() -> int:
         "overlapCount", "overlapPct",
         "fileLevelCount", "fileLevelPct",
         "bothEmptyCount", "bothEmptyPct",
+        "gtOnlyCount", "gtOnlyPct",
+        "llmOnlyCount", "llmOnlyPct",
+        "differentFilesCount", "differentFilesPct",
+        "llmSupersetCount", "llmSupersetPct",
+        "gtSupersetCount", "gtSupersetPct",
+        "partialFileOverlapCount", "partialFileOverlapPct",
         "noMatchCount", "noMatchPct",
         "nonComparableCount", "nonComparablePct",
     ]
@@ -691,6 +745,8 @@ def main() -> int:
         "ruleKey",
         "catalogId",
         "category",
+        "llmFindingCount",
+        "groundTruthFindingCount",
         "matchType",
     ]
 

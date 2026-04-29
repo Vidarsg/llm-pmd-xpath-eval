@@ -21,6 +21,9 @@ Usage example:
     --jobs 2
 
 Resume without rerunning completed outputs by omitting --force.
+
+Pilot runs can set "maxRules": 10 in a run entry to process only the first
+10 input rules.
 """
 
 
@@ -140,6 +143,8 @@ def run_condition(
                 spec["model"],
                 "--max-tokens",
                 str(spec["maxTokens"]),
+                "--max-rules",
+                str(spec["maxRules"]),
                 "--temperature",
                 str(spec["temperature"]),
                 "--prompt-style",
@@ -183,6 +188,7 @@ def build_run_specs(config: dict) -> list[dict]:
     for run in config["runs"]:
         runCount = int(run.get("runCount", 1))
         max_tokens = int(run.get("maxTokens", 1500))
+        max_rules = int(run.get("maxRules", 0))
         prompt_styles = run["promptStyles"]
         temperatures = run["temperatures"]
         targets = run.get("targets")
@@ -192,6 +198,8 @@ def build_run_specs(config: dict) -> list[dict]:
             raise ValueError(f"Run '{run['name']}' must define at least one target")
         if runCount < 1:
             raise ValueError(f"Run '{run['name']}' must have runCount >= 1")
+        if max_rules < 0:
+            raise ValueError(f"Run '{run['name']}' must have maxRules >= 0")
 
         # Cartesian-product expansion makes each generated spec a single,
         # reproducible condition with one model/target/prompt/temperature/repeat.
@@ -210,6 +218,7 @@ def build_run_specs(config: dict) -> list[dict]:
                     "temperature": temperature,
                     "runCount": repeat_index,
                     "maxTokens": max_tokens,
+                    "maxRules": max_rules,
                 }
             )
     return specs
