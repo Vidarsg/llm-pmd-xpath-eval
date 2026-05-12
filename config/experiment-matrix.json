@@ -1,14 +1,21 @@
 {
-  "experimentName": "test-experiment",
+  "experimentName": "Final-Experiment",
   "outputRoot": "out/experiments",
   "generatorScript": "scripts/generation/llm-xpath-generator.py",
   "validatorScript": "scripts/pmd/validate-llm-generated-xpaths.ps1",
   "runs": [
     {
-      "name": "model-testing",
-      "inputRules": "config/pmd-official-rule-descriptions.jsonl",
+      "name": "jPinpoint_AllTargets_AllModels_Few-Shot",
+      "inputRules": "config/custom-rulesets/jPinpoint/jpinpoint-rule-descriptions.jsonl",
       "targets": [
-        "C:/users/vidar/desktop/WebGoat/src"
+        "C:/users/vidar/desktop/commons-lang",
+        "C:/users/vidar/desktop/dropwizard",
+        "C:/users/vidar/desktop/immutables",
+        "C:/users/vidar/desktop/jdbi",
+        "C:/users/vidar/desktop/junit4",
+        "C:/users/vidar/desktop/liquibase",
+        "C:/users/vidar/desktop/picocli",
+        "C:/users/vidar/desktop/WebGoat"
       ],
       "models": [
         {
@@ -17,26 +24,29 @@
           "apiKeyEnv": "API_KEY"
         },
         {
-          "name": "mistralai/Devstral-Small-2-24B-Instruct-2512",
+          "name": "openai/gpt-oss-120b",
           "baseUrl": "https://llm.hpc.ntnu.no/",
           "apiKeyEnv": "API_KEY"
         },
         {
-          "name": "Qwen/Qwen3.6-27B-FP8",
+          "name": "Qwen/Qwen3.5-122B-A10B-FP8",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "mistralai/Mistral-Large-3-675B-Instruct-2512-NVFP4",
           "baseUrl": "https://llm.hpc.ntnu.no/",
           "apiKeyEnv": "API_KEY"
         }
       ],
       "promptStyles": [
-        "zero-shot",
         "few-shot"
       ],
       "temperatures": [
-        0.0,
         0.7
       ],
-      "runCount": 2,
-      "maxRules": 10,
+      "runCount": 3,
+      "maxRules": 0,
       "maxTokens": 1500
     }
   ]

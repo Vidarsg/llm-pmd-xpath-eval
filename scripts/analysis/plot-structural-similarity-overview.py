@@ -43,6 +43,26 @@ def percentile(sorted_values: list[float], p: float) -> float:
     return sorted_values[lower] + (sorted_values[upper] - sorted_values[lower]) * fraction
 
 
+def short_model_name(model: str) -> str:
+    """Shorten provider-heavy model identifiers while keeping them recognizable."""
+    name = model.strip().replace("\\", "/")
+    aliases = {
+        "openai/openai/gpt-oss-120b": "gpt-oss-120b",
+        "openai/Qwen/Qwen3.5-122B-A10B-FP8": "Qwen3.5-122B",
+        "openai/Qwen/Qwen3.6-27B-FP8": "Qwen3.6-27B",
+        "moonshotai/Kimi-K2.6": "Kimi-K2.6",
+        "mistralai/Mistral-Large-3-675B-Instruct-2512-NVFP4": "Mistral-Large",
+        "mistralai/Devstral-Small-2-24B-Instruct-2512": "Devstral-Small",
+        "google/gemma-4-31B-it": "Gemma-4-31B",
+    }
+    if name in aliases:
+        return aliases[name]
+    parts = [part for part in name.split("/") if part]
+    if not parts:
+        return model
+    return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Plot a structural-similarity overview from summary CSV outputs."
@@ -73,26 +93,28 @@ def main() -> int:
 
     label = summary_rows[0].get("label", "Structural Similarity")
 
-    # If the summary only contains one overall row, derive the per-condition groups from the per-rule CSV.
+    # Derive per-condition groups from the per-rule CSV. Include the model so
+    # runs from different LMs are not collapsed into one prompt/temp/run bucket.
     grouped = defaultdict(list)
     for row in per_rule_rows:
         if not str(row.get("structurallyComparable", "")).lower() == "true":
             continue
+        model = str(row.get("model", "all"))
         prompt_style = str(row.get("promptStyle", "all"))
         temperature = str(row.get("temperature", "all"))
         run_count = str(row.get("runCount", "all"))
-        grouped[(prompt_style, temperature, run_count)].append(row)
+        grouped[(model, prompt_style, temperature, run_count)].append(row)
 
     if not grouped:
         # Fall back to one combined group when the per-rule CSV has no prompt/temperature columns.
         comparable_rows = [row for row in per_rule_rows if str(
             row.get("structurallyComparable", "")).lower() == "true"]
-        grouped[("all", "all", "all")] = comparable_rows
+        grouped[("all", "all", "all", "all")] = comparable_rows
 
-    ordered_keys = sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
+    ordered_keys = sorted(grouped.keys(), key=lambda item: (item[0], item[1], item[2], item[3]))
     labels = [
-        f"{key[0]}\nT={key[1]}\nrun {key[2]}"
-        if key != ("all", "all", "all")
+        f"{short_model_name(key[0])}\n{key[1]}\nT={key[2]}\nrun {key[3]}"
+        if key != ("all", "all", "all", "all")
         else "all rules"
         for key in ordered_keys
     ]
@@ -118,9 +140,10 @@ def main() -> int:
         all_group_rows = [
             row
             for row in per_rule_rows
-            if str(row.get("promptStyle", "all")) == key[0]
-            and str(row.get("temperature", "all")) == str(key[1])
-            and str(row.get("runCount", "all")) == str(key[2])
+            if str(row.get("model", "all")) == key[0]
+            and str(row.get("promptStyle", "all")) == key[1]
+            and str(row.get("temperature", "all")) == str(key[2])
+            and str(row.get("runCount", "all")) == str(key[3])
         ]
         group_total = len(all_group_rows)
         group_comparable = len(rows)
@@ -138,20 +161,20 @@ def main() -> int:
         median_scores.append(percentile(overall_scores, 0.5)
                              if overall_scores else 0.0)
 
-    prompt_style_runs = sorted({(key[0], key[2]) for key in ordered_keys})
-    temperatures = sorted({str(key[1]) for key in ordered_keys})
+    prompt_style_runs = sorted({(key[0], key[1], key[3]) for key in ordered_keys})
+    temperatures = sorted({str(key[2]) for key in ordered_keys})
     heatmap = np.full((len(prompt_style_runs), len(temperatures)), np.nan)
     for key, median in zip(ordered_keys, median_scores):
         heatmap[prompt_style_runs.index(
-            (key[0], key[2])), temperatures.index(str(key[1]))] = median
+            (key[0], key[1], key[3])), temperatures.index(str(key[2]))] = median
 
-    fig_width = max(10.0, len(labels) * 1.5)
+    fig_width = max(11.0, len(labels) * 1.7)
     fig, axes = plt.subplots(2, 2, figsize=(
         fig_width, 9), constrained_layout=True)
 
     ax = axes[0, 0]
     ax.bar(np.arange(len(labels)), comparable_pct, color="#4c9f70")
-    ax.set_title("LLM-Generated Rules With Parsed XPath AST")
+    ax.set_title("Generated XPath Rules That Could Be Parsed")
     ax.set_ylabel("Percent")
     ax.set_ylim(0, 100)
     ax.set_xticks(np.arange(len(labels)))
@@ -168,7 +191,7 @@ def main() -> int:
     for patch in bp["boxes"]:
         patch.set_facecolor("#8fb9d9")
         patch.set_alpha(0.9)
-    ax.set_title("Overall Structural Similarity Distribution")
+    ax.set_title("Distribution of AST Similarity Scores")
     ax.set_ylabel("Overall structural similarity")
     ax.set_ylim(0, 1)
     ax.set_xticks(range(1, len(labels) + 1))
@@ -181,20 +204,20 @@ def main() -> int:
     ax.bar(xpos, mean_edge, width=width, label="Edge", color="#f58518")
     ax.bar(xpos + width, mean_scalar, width=width,
            label="Scalar", color="#54a24b")
-    ax.set_title("Mean Structural Components")
+    ax.set_title("Average AST Similarity Components")
     ax.set_ylabel("Similarity")
     ax.set_ylim(0, 1)
     ax.set_xticks(xpos)
     ax.set_xticklabels(labels, rotation=35, ha="right")
-    ax.legend(frameon=False, fontsize=9)
+    ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1.0))
 
     ax = axes[1, 1]
     image = ax.imshow(heatmap, cmap="Blues", vmin=0, vmax=1, aspect="auto")
-    ax.set_title("Median Structural Similarity Heatmap")
+    ax.set_title("Median AST Similarity by Condition")
     ax.set_xticks(np.arange(len(temperatures)))
     ax.set_xticklabels([f"T={value}" for value in temperatures])
     ax.set_yticks(np.arange(len(prompt_style_runs)))
-    ax.set_yticklabels([f"{prompt}\nrun {run}" for prompt, run in prompt_style_runs])
+    ax.set_yticklabels([f"{short_model_name(model)}\n{prompt}\nrun {run}" for model, prompt, run in prompt_style_runs])
     for row_index in range(len(prompt_style_runs)):
         for col_index in range(len(temperatures)):
             value = heatmap[row_index, col_index]
@@ -203,9 +226,9 @@ def main() -> int:
             ax.text(col_index, row_index,
                     f"{value:.2f}", ha="center", va="center", color="black", fontsize=9)
     fig.colorbar(image, ax=ax, fraction=0.046,
-                 pad=0.04, label="Median similarity")
+                 pad=0.04, label="Median AST similarity")
 
-    fig.suptitle(f"Structural Similarity Overview - {label}", fontsize=14)
+    fig.suptitle(f"XPath AST Similarity Overview - {label}", fontsize=14)
 
     out_figure = Path(args.out_figure)
     ensure_parent(out_figure)

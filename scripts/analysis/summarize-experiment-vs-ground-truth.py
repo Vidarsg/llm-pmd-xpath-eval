@@ -18,6 +18,14 @@ Usage example:
     --ground-truth-results out/catalog-runs/catalog-run/results.jsonl \
     --catalog-path config/pmd-catalog.json \
     --out-dir out/analysis-summary
+
+For multi-target experiments, use --ground-truth-root instead:
+  python scripts/analysis/summarize-experiment-vs-ground-truth.py \
+    --aggregated-results out/experiments/experiment/aggregated-results.jsonl \
+    --experiment-root out/experiments/experiment \
+    --ground-truth-root out/catalog-runs \
+    --catalog-path config/pmd-catalog.json \
+    --out-dir out/analysis-summary
 """
 
 
@@ -93,6 +101,26 @@ def load_ground_truth_index(gt_results_path: Path) -> tuple[dict[str, dict], Pat
     return {str(row["ruleKey"]): row for row in rows}, reports_dir
 
 
+def load_ground_truth_by_target(ground_truth_root: Path) -> dict[str, tuple[dict[str, dict], Path]]:
+    """Load catalog-run_<target>/results.jsonl files keyed by target directory name."""
+    mapping = {}
+    for results_path in sorted(ground_truth_root.glob("catalog-run_*/results.jsonl")):
+        target_name = results_path.parent.name.removeprefix("catalog-run_")
+        mapping[target_name.lower()] = load_ground_truth_index(results_path)
+    return mapping
+
+
+def get_ground_truth_for_target(
+    target_name: str,
+    single_ground_truth: tuple[dict[str, dict], Path] | None,
+    ground_truth_by_target: dict[str, tuple[dict[str, dict], Path]],
+) -> tuple[dict[str, dict], Path] | None:
+    """Return the correct ground-truth index/report directory for one target."""
+    if single_ground_truth is not None:
+        return single_ground_truth
+    return ground_truth_by_target.get(target_name.lower())
+
+
 def parse_report_violations(report_path: Path, cache: dict[Path, dict]) -> dict:
     """Read one PMD JSON report and extract violations plus script-detected error flags."""
     if report_path in cache:
@@ -113,6 +141,16 @@ def parse_report_violations(report_path: Path, cache: dict[Path, dict]) -> dict:
 
     try:
         data = json.loads(report_path.read_text(encoding="utf-8-sig"))
+    except UnicodeDecodeError as exc:
+        result = {
+            "files": {},
+            "hadConfigErrors": False,
+            "hadProcessingErrors": True,
+            "exists": True,
+            "parseError": f"report is not valid UTF-8: {exc}",
+        }
+        cache[report_path] = result
+        return result
     except json.JSONDecodeError as exc:
         result = {
             "files": {},
@@ -290,6 +328,39 @@ def write_markdown_table(path: Path, title: str, rows: list[dict], fieldnames: l
                     for name in fieldnames) + " |\n")
 
 
+def normalize_resolved_path(path: str | Path) -> str:
+    """Resolve a path for robust comparisons between run-specs and artifacts."""
+    return str(Path(path).resolve()).lower()
+
+
+def structural_generated_jsonl_path(structural_results_path: Path) -> Path | None:
+    """Infer the generated.jsonl that produced one structural result file."""
+    structural_dir = structural_results_path.parent
+    if structural_dir.name != "structural":
+        return None
+
+    run_count_dir = structural_dir.parent
+    candidates = sorted(run_count_dir.glob("*/generated.jsonl"))
+    if not candidates:
+        # Compatibility with structural outputs created before shared
+        # generation artifacts were placed under runCount_<N>/structural.
+        candidates = sorted(run_count_dir.rglob("generated.jsonl"))
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
+
+
+def load_run_specs_by_generated_jsonl(experiment_root: Path) -> dict[str, dict]:
+    """Index run-spec metadata by the generatedJsonl path recorded in each run."""
+    specs = {}
+    for spec_path in experiment_root.rglob("run-spec.json"):
+        spec = json.loads(spec_path.read_text(encoding="utf-8-sig"))
+        generated_jsonl = str(spec.get("generatedJsonl", "")).strip()
+        if generated_jsonl:
+            specs[normalize_resolved_path(generated_jsonl)] = spec
+    return specs
+
+
 def find_associated_run_spec(structural_results_path: Path, experiment_root: Path) -> dict | None:
     """Best-effort lookup of the run-spec matching one structural-similarity result file."""
     current = structural_results_path.parent
@@ -326,9 +397,14 @@ def load_structural_rows(
 
     structural_files = sorted(
         experiment_root.rglob("structural-similarity.jsonl"))
+    specs_by_generated_jsonl = load_run_specs_by_generated_jsonl(experiment_root)
     rows = []
     for structural_file in structural_files:
         spec = find_associated_run_spec(structural_file, experiment_root)
+        if spec is None:
+            generated_jsonl = structural_generated_jsonl_path(structural_file)
+            if generated_jsonl is not None:
+                spec = specs_by_generated_jsonl.get(normalize_resolved_path(generated_jsonl))
         for row in read_json_records(structural_file):
             enriched = dict(row)
             # Structural result rows produced in batch mode do not always carry
@@ -523,8 +599,10 @@ def main() -> int:
                     help="Path to aggregated-results.jsonl")
     ap.add_argument("--experiment-root", required=True,
                     help="Experiment root containing run-spec.json files")
-    ap.add_argument("--ground-truth-results", required=True,
+    ap.add_argument("--ground-truth-results",
                     help="Ground-truth results.jsonl path")
+    ap.add_argument("--ground-truth-root",
+                    help="Directory containing catalog-run_<target>/results.jsonl ground-truth runs")
     ap.add_argument("--catalog-path", default="config/pmd-catalog.json",
                     help="PMD catalog JSON for numeric ruleKey to PMD id mapping")
     ap.add_argument("--structural-results",
@@ -534,11 +612,27 @@ def main() -> int:
     ap.add_argument("--out-dir", required=True,
                     help="Directory for summary tables")
     args = ap.parse_args()
+    if bool(args.ground_truth_results) == bool(args.ground_truth_root):
+        raise SystemExit(
+            "Specify exactly one of --ground-truth-results or --ground-truth-root"
+        )
 
     aggregated_rows = read_json_records(Path(args.aggregated_results))
     run_report_dirs = load_run_report_dirs(Path(args.experiment_root))
-    gt_index, gt_reports_dir = load_ground_truth_index(
-        Path(args.ground_truth_results))
+    single_ground_truth = (
+        load_ground_truth_index(Path(args.ground_truth_results))
+        if args.ground_truth_results
+        else None
+    )
+    ground_truth_by_target = (
+        load_ground_truth_by_target(Path(args.ground_truth_root))
+        if args.ground_truth_root
+        else {}
+    )
+    if args.ground_truth_root and not ground_truth_by_target:
+        raise SystemExit(
+            f"No catalog-run_<target>/results.jsonl files found under {args.ground_truth_root}"
+        )
     catalog_path = Path(args.catalog_path)
     catalog_index = load_catalog_rule_order(catalog_path)
     catalog_metadata = load_catalog_rule_metadata(catalog_path)
@@ -568,6 +662,31 @@ def main() -> int:
             row["ruleKey"]).isdigit() else str(row["ruleKey"])
         rule_metadata = catalog_metadata.get(str(mapped_rule_id), {})
         rule_category = str(rule_metadata.get("category", "Unknown"))
+        ground_truth = get_ground_truth_for_target(
+            group[0], single_ground_truth, ground_truth_by_target)
+        if ground_truth is None:
+            # Multi-target mode requires a matching catalog run per target.
+            # Keep the row visible as non-comparable instead of silently using
+            # the wrong repository's ground truth.
+            behavior_counters[group]["totalRules"] += 1
+            behavior_counters[group]["non-comparable"] += 1
+            behavior_per_rule_rows.append(
+                {
+                    "target": group[0],
+                    "model": group[1],
+                    "promptStyle": group[2],
+                    "temperature": group[3],
+                    "runCount": group[4],
+                    "ruleKey": row.get("ruleKey"),
+                    "catalogId": mapped_rule_id,
+                    "category": rule_category,
+                    "llmFindingCount": "",
+                    "groundTruthFindingCount": "",
+                    "matchType": "non-comparable",
+                }
+            )
+            continue
+        gt_index, gt_reports_dir = ground_truth
         gt_row = gt_index.get(str(mapped_rule_id))
         if gt_row is None:
             # Without a ground-truth record there is no meaningful behavioral

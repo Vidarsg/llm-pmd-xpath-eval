@@ -169,8 +169,16 @@ def find_generated_jsonl_files(experiment_root: Path) -> list[Path]:
 
 def inferred_structural_dir(generated_jsonl: Path) -> Path:
     """Place structural-analysis artifacts next to generation/evaluation inside the run root."""
-    # generated.jsonl lives under run_root/generation/<promptStyle>/, so two
-    # parents up returns the run root.
+    # Shared matrix generation stores files under:
+    #   run/_generation/<inputRules>/<model>/temp_<T>/runCount_<N>/<promptStyle>/generated.jsonl
+    # In that layout, structural output belongs under the runCount directory so
+    # path-based summary code can still infer model, temperature, and runCount.
+    parts = generated_jsonl.parts
+    if "_generation" in parts:
+        return generated_jsonl.parent.parent / "structural"
+
+    # Older generated.jsonl files live under run_root/generation/<promptStyle>/,
+    # so two parents up returns the run root.
     generation_dir = generated_jsonl.parent
     run_root = generation_dir.parent.parent
     return run_root / "structural"

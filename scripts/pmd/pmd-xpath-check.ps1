@@ -21,7 +21,11 @@ param(
     [ValidateSet("text", "json", "xml")]
     [string]$Format = "json",
 
-    [string]$OutReport = ".\out"
+    [string]$OutReport = ".\out",
+
+    [int]$TimeoutSeconds = 300,
+
+    [long]$MaxReportBytes = 52428800
 )
 
 # Enable strict mode to catch undefined variables and other mistakes early that could lead to silent failures.
@@ -65,6 +69,23 @@ function Write-Utf8NoBom([string]$Path, [string]$Content) {
     [System.IO.File]::WriteAllText($Path, $Content, (New-Object System.Text.UTF8Encoding($false)))
 }
 
+function Test-ReportTooLarge([string]$Path, [long]$LimitBytes) {
+    if (-not (Test-Path $Path)) { return $false }
+    return ((Get-Item $Path).Length -gt $LimitBytes)
+}
+
+function Write-CompactOversizedReport([string]$Path, [long]$OriginalBytes, [long]$LimitBytes) {
+    $compact = [ordered]@{
+        files = @()
+        scriptDetectedOversizedReport = [ordered]@{
+            originalBytes = $OriginalBytes
+            limitBytes    = $LimitBytes
+            message       = "PMD produced a report larger than the configured safety limit; the report was replaced to avoid parser lockups."
+        }
+    }
+    Write-Utf8NoBom -Path $Path -Content ($compact | ConvertTo-Json -Depth 10)
+}
+
 function Remove-ViolationPriorityFromJsonReport([string]$Path) {
     # Removes the PMD-emitted priority property from the violation reports,
     # because it always resorts to a default value, and is not relevant to the validation of the XPath rule itself.
@@ -77,7 +98,10 @@ function Remove-ViolationPriorityFromJsonReport([string]$Path) {
         return
     }
 
-    foreach ($file in @($report.files)) {
+    $filesProp = $report.PSObject.Properties["files"]
+    if ($null -eq $filesProp) { return }
+
+    foreach ($file in @($filesProp.Value)) {
         foreach ($v in @($file.violations)) {
             if ($null -ne $v -and $v.PSObject.Properties["priority"]) {
                 $v.PSObject.Properties.Remove("priority")
@@ -259,14 +283,44 @@ $pmdArgs = @(
 # Wraps each argument in quotes to handle spaces and special characters, then constructs the full command line.
 $quotedArgs = ($pmdArgs | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join " "
 $cmdLine = '"' + $PmdBin + '" ' + $quotedArgs + ' 1>"' + $stdoutPath + '" 2>"' + $stderrPath + '"'
+$cmdFile = Join-Path $work "run-pmd.cmd"
+$cmdFileContent = @"
+@echo off
+$cmdLine
+exit /b %ERRORLEVEL%
+"@
+[System.IO.File]::WriteAllText($cmdFile, $cmdFileContent, [System.Text.Encoding]::ASCII)
 
-# Execution via cmd.exe
-& $env:ComSpec /c $cmdLine
-# After execution, PMD's exit code indicates the overall result
-$exitCode = $LASTEXITCODE
+# Execution via cmd.exe, with a timeout so pathological XPath expressions
+# cannot block an entire experiment run indefinitely.
+$process = Start-Process -FilePath $env:ComSpec -ArgumentList ("/d /c """ + $cmdFile + """") -PassThru -WindowStyle Hidden
+$timedOut = $false
+if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+    $timedOut = $true
+    try {
+        & taskkill.exe /PID $process.Id /T /F | Out-Null
+    }
+    catch {
+        try { $process.Kill() } catch { }
+    }
+}
+
+# After execution, PMD's exit code indicates the overall result.
+$exitCode = if ($timedOut) { 124 } else { $process.ExitCode }
+if ($timedOut) {
+    Add-Content -Path $stderrPath -Value ("[ERROR] PMD validation timed out after {0} seconds." -f $TimeoutSeconds)
+}
+
+$reportTooLarge = $false
+$oversizedReportBytes = 0
+if ($Format -eq "json" -and (Test-ReportTooLarge -Path $reportPath -LimitBytes $MaxReportBytes)) {
+    $reportTooLarge = $true
+    $oversizedReportBytes = (Get-Item $reportPath).Length
+    Write-CompactOversizedReport -Path $reportPath -OriginalBytes $oversizedReportBytes -LimitBytes $MaxReportBytes
+}
 
 # Normalize JSON report payload to remove per-violation priority metadata.
-if ($Format -eq "json") {
+if ($Format -eq "json" -and -not $reportTooLarge) {
     Remove-ViolationPriorityFromJsonReport -Path $reportPath
     Remove-UnhelpfulPmdJsonFields -Path $reportPath
 }
@@ -286,6 +340,7 @@ $configErrorCount = 0
 $processingErrorCountReport = 0
 $processingErrorCountStderr = 0
 $syntacticValid = $false
+$malformedReport = $false
 
 if ($Format -eq "json" -and (Test-Path $reportPath)) {
     try {
@@ -294,10 +349,16 @@ if ($Format -eq "json" -and (Test-Path $reportPath)) {
 
         # Count the total number of violations across all files.
         $count = 0
-        foreach ($f in @($j.files)) {
-            if ($null -ne $f.violations) { $count += @($f.violations).Count }
+        $filesProp = $j.PSObject.Properties["files"]
+        if ($null -eq $filesProp) {
+            $malformedReport = $true
         }
-        $violationCount = $count
+        else {
+            foreach ($f in @($filesProp.Value)) {
+                if ($null -ne $f.violations) { $count += @($f.violations).Count }
+            }
+        }
+        $violationCount = if ($malformedReport) { $null } else { $count }
 
         # Count configuration errors and processing errors from the JSON report.
         $configErrorsProp = $j.PSObject.Properties["configurationErrors"]
@@ -315,10 +376,15 @@ if ($Format -eq "json" -and (Test-Path $reportPath)) {
         # By keeping defaults, we allow error detection to continue via preferred signals (exit code, stderr patterns).
         $violationCount = $null
         $hadConfigErrors = $false
-        $hadProcErrors = $false
+        $hadProcErrors = $true
         $configErrorCount = 0
         $processingErrorCountReport = 0
+        $malformedReport = $true
     }
+}
+
+if ($reportTooLarge) {
+    $violationCount = $null
 }
 
 # PMD's JSON report is not always complete; it may omit certain error details.
@@ -334,11 +400,15 @@ if ($exitCode -eq 5) {
 # Signal 2: Count "Parsing failed" occurrences in stderr as an additional signal of processing errors.
 $processingErrorCountStderr = 0
 if ($stderr) {
-    $processingErrorCountStderr = ([regex]::Matches($stderr, "\[ERROR\]\s+Parsing failed")).Count
+    $processingErrorPattern = "\[ERROR\]\s+Parsing failed|Unknown error occurred while executing a PmdRunnable|Exception in thread|StackOverflowError|OutOfMemoryError"
+    $processingErrorCountStderr = ([regex]::Matches($stderr, $processingErrorPattern)).Count
 }
 
 # Derive "hadProcessingErrors" once from all available signals.
 $hadProcErrors = ($processingErrorCountReport -gt 0) -or ($processingErrorCountStderr -gt 0) -or $hadProcErrorsExitCode
+if ($timedOut -or $reportTooLarge -or $malformedReport) {
+    $hadProcErrors = $true
+}
 
 
 # Configuration errors (invalid XPath syntax, unknown functions, malformed XML) prevent the rule from being compiled by PMD.
@@ -416,5 +486,9 @@ if ($Format -eq "json") {
     stderrPath                 = $stderrPath
     stdoutSnippet              = (Snip $stdout 1200)
     stderrSnippet              = (Snip $stderr 1200)
+    timedOut                   = $timedOut
+    reportTooLarge             = $reportTooLarge
+    oversizedReportBytes       = $oversizedReportBytes
+    malformedReport            = $malformedReport
 } | ConvertTo-Json -Depth 10
 

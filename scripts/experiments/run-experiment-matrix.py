@@ -3,9 +3,11 @@ import json
 import os
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import product
 from pathlib import Path
+from threading import Lock
 
 """Expand and run an LLM XPath generation experiment matrix.
 
@@ -24,7 +26,15 @@ Resume without rerunning completed outputs by omitting --force.
 
 Pilot runs can set "maxRules": 10 in a run entry to process only the first
 10 input rules.
+
+DSPy runs can set "dspyProgram": "out/dspy/pmd-xpath-cot-optimized.json"
+to load a precompiled DSPy program during generation.
 """
+
+
+GENERATION_LOCKS: dict[str, Lock] = {}
+GENERATION_LOCKS_LOCK = Lock()
+GENERATED_THIS_RUN: set[str] = set()
 
 
 def sanitize(value: str) -> str:
@@ -67,6 +77,23 @@ def run_command(command: list[str], cwd: Path) -> None:
             f"Command failed with exit code {completed.returncode}: {' '.join(command)}")
 
 
+def format_duration(seconds: float) -> str:
+    """Format elapsed wall-clock seconds as HH:MM:SS."""
+    total_seconds = int(seconds)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+def generation_lock(path: Path) -> Lock:
+    """Return one in-process lock per generated output path."""
+    key = str(path.resolve())
+    with GENERATION_LOCKS_LOCK:
+        if key not in GENERATION_LOCKS:
+            GENERATION_LOCKS[key] = Lock()
+        return GENERATION_LOCKS[key]
+
+
 def run_condition(
     index: int,
     total: int,
@@ -83,6 +110,7 @@ def run_condition(
     """Run generation and validation for one fully expanded experiment condition."""
     model_slug = sanitize(spec["model"])
     target_slug = sanitize(Path(spec["target"]).name)
+    input_slug = sanitize(Path(spec["inputRules"]).stem)
     prompt_style = sanitize(spec["promptStyle"])
     temp_slug = sanitize(str(spec["temperature"]))
     runCount_slug = f"runCount_{spec['runCount']}"
@@ -95,7 +123,16 @@ def run_condition(
         / f"temp_{temp_slug}"
         / runCount_slug
     )
-    generation_dir = run_root / "generation" / prompt_style
+    generation_dir = (
+        experiment_root
+        / sanitize(spec["runName"])
+        / "_generation"
+        / input_slug
+        / model_slug
+        / f"temp_{temp_slug}"
+        / runCount_slug
+        / prompt_style
+    )
     evaluation_dir = run_root / "evaluation"
     generated_jsonl = generation_dir / "generated.jsonl"
     validation_results = evaluation_dir / "results.jsonl"
@@ -127,34 +164,43 @@ def run_condition(
     print(condition_label, flush=True)
 
     if not skip_generation:
-        if force or not file_has_content(generated_jsonl):
-            # Generation is a Python script so it uses the same interpreter
-            # that launched this matrix driver.
-            command = [
-                sys.executable,
-                str(generator_script),
-                "--in",
-                resolved_spec["inputRules"],
-                "--out",
-                str(generated_jsonl),
-                "--base-url",
-                spec["baseUrl"],
-                "--model",
-                spec["model"],
-                "--max-tokens",
-                str(spec["maxTokens"]),
-                "--max-rules",
-                str(spec["maxRules"]),
-                "--temperature",
-                str(spec["temperature"]),
-                "--prompt-style",
-                spec["promptStyle"],
-                "--api-key",
-                spec["apiKeyEnv"],
-            ]
-            run_command(command, repo_root)
-        else:
-            print(f"  Skip generation: {generated_jsonl}", flush=True)
+        with generation_lock(generated_jsonl):
+            generated_key = str(generated_jsonl.resolve())
+            should_generate = (
+                (force and generated_key not in GENERATED_THIS_RUN)
+                or (not force and not file_has_content(generated_jsonl))
+            )
+            if should_generate:
+                # Generation is target-independent, so this shared output is
+                # reused for validation across all target repositories.
+                command = [
+                    sys.executable,
+                    str(generator_script),
+                    "--in",
+                    resolved_spec["inputRules"],
+                    "--out",
+                    str(generated_jsonl),
+                    "--base-url",
+                    spec["baseUrl"],
+                    "--model",
+                    spec["model"],
+                    "--max-tokens",
+                    str(spec["maxTokens"]),
+                    "--max-rules",
+                    str(spec["maxRules"]),
+                    "--temperature",
+                    str(spec["temperature"]),
+                    "--prompt-style",
+                    spec["promptStyle"],
+                    "--api-key",
+                    spec["apiKeyEnv"],
+                ]
+                if spec.get("dspyProgram"):
+                    command.extend(["--dspy-program", str((repo_root / spec["dspyProgram"]).resolve())])
+                run_command(command, repo_root)
+                GENERATED_THIS_RUN.add(generated_key)
+            else:
+                print(f"  Skip generation: {generated_jsonl}", flush=True)
 
     if not skip_validation:
         if force or not file_has_content(validation_results):
@@ -189,6 +235,7 @@ def build_run_specs(config: dict) -> list[dict]:
         runCount = int(run.get("runCount", 1))
         max_tokens = int(run.get("maxTokens", 1500))
         max_rules = int(run.get("maxRules", 0))
+        dspy_program = str(run.get("dspyProgram", "")).strip()
         prompt_styles = run["promptStyles"]
         temperatures = run["temperatures"]
         targets = run.get("targets")
@@ -219,6 +266,7 @@ def build_run_specs(config: dict) -> list[dict]:
                     "runCount": repeat_index,
                     "maxTokens": max_tokens,
                     "maxRules": max_rules,
+                    "dspyProgram": str(model.get("dspyProgram") or dspy_program),
                 }
             )
     return specs
@@ -270,6 +318,7 @@ def main() -> int:
     specs = build_run_specs(config)
 
     print(f"Loaded {len(specs)} run condition(s) from {config_path}")
+    started_at = time.perf_counter()
 
     if args.jobs == 1:
         for index, spec in enumerate(specs, start=1):
@@ -324,7 +373,9 @@ def main() -> int:
             details = "\n".join(f"- {label}: {exc}" for label, exc in failures)
             raise RuntimeError(f"{len(failures)} condition(s) failed:\n{details}")
 
+    elapsed = time.perf_counter() - started_at
     print(f"Experiment outputs written under: {experiment_root}")
+    print(f"Total experiment runtime: {format_duration(elapsed)} ({elapsed:.2f} seconds)")
     return 0
 
 

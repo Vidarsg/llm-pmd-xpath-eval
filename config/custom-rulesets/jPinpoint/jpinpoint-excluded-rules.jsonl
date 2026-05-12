@@ -1,0 +1,5 @@
+{"originalRuleKey": 47, "catalogId": "UsingSuppressWarnings", "reason": "XPath uses rule-property variables that the standalone XPath AST parser does not bind"}
+{"originalRuleKey": 48, "catalogId": "UsingSuppressWarningsHighRisk", "reason": "XPath uses rule-property variables that the standalone XPath AST parser does not bind"}
+{"originalRuleKey": 56, "catalogId": "LimitNestingInLambdas", "reason": "XPath uses rule-property variables that the standalone XPath AST parser does not bind"}
+{"originalRuleKey": 57, "catalogId": "LimitStatementsInLambdas", "reason": "XPath uses rule-property variables that the standalone XPath AST parser does not bind"}
+{"originalRuleKey": 58, "catalogId": "LimitWildcardStaticImports", "reason": "XPath uses rule-property variables that the standalone XPath AST parser does not bind"}

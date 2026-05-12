@@ -5,9 +5,8 @@
 # Usage:
 #   set API_KEY=<personal api key>
 #   python .\scripts\generation\llm-xpath-generator.py --in <input JSONL file location> --out <output JSONL file location>
-#     --base-url <LLM API base URL> --model <model identifier> --max-tokens <maximum tokens in response> --temperature <sampling temperature>
-#   python .\scripts\generation\llm-xpath-generator.py --in config\pmd-official-rule-descriptions.jsonl --out out\llm-output\pilot.jsonl `
-#     --base-url https://llm.example.com --model vendor/model-name --prompt-style few-shot --max-rules 10
+#     --base-url <LLM API base URL> --model <model identifier> --prompt-style <prompt style> --temperature <sampling temperature>
+#     --max-tokens <maximum tokens in response> --max-rules <maximum number of rules to process, 0 for all>
 
 import argparse
 from datetime import datetime, timezone
@@ -82,51 +81,23 @@ Rule description:
 {{RULE_DESCRIPTION}}
 """
 
-MULTI_STEP_TEMPLATE = """You are generating a PMD 7.20 Java XPath expression.
+DSPY_COT_INSTRUCTIONS = """You are a PMD 7.20 Java XPath rule expert.
 
-Task:
-Generate exactly one PMD Java XPath expression from the rule description below.
+Given a natural-language Java coding rule description, reason about the PMD Java AST internally and produce exactly one XPath expression that detects violations of the rule.
 
-Follow this process internally:
+The XPath must target PMD 7 Java AST nodes and may use PMD Java XPath functions such as pmd-java:typeIs, pmd-java:typeIsExactly, pmd-java:matchesSig, pmd-java:nodeIs, pmd-java:hasAnnotation, and pmd-java:modifiers when appropriate.
 
-Step 1: AST verification planning
-Given the rule description, derive the minimal verification steps needed on a Java AST.
-For each step, identify:
-- which AST node or subtree should be inspected
-- what property, attribute, relationship, or type condition must hold
-- whether the step narrows the match or excludes false positives
+PMD 7 uses XPath 3.1. Do not use any other version of XPath syntax. Do not use any PMD functions that are not supported in PMD 7.
 
-Step 2: XPath construction
-Translate those verification steps into one XPath expression.
-- Start from the narrowest stable AST anchor you can justify
-- Encode each verification step as a predicate, path constraint, or function call
-- Prefer patterns commonly used in official PMD Java XPath rules
-
-Step 3: Syntax self-check
-Before answering, verify that the XPath:
-- has balanced brackets and parentheses
-- contains valid predicates
-- is exactly one XPath expression
-- contains no prose, labels, markdown, code fences, or XML wrapper
-
-Hard requirements:
-- Prefer a conservative valid XPath over an ambitious fragile XPath.
-- Do not invent PMD functions or AST node names.
-- Do not use unsupported syntax.
-- Output no explanation, no steps, no markdown, no XML wrapper, no comments.
-- Do not output <think> tags or reasoning text.
-- If you reason internally, do not reveal it. Output only the final raw XPath.
-- Return exactly one raw XPath expression and nothing else.
-
-Rule description:
-{{RULE_DESCRIPTION}}
+Return only the final raw XPath expression in the xpath output field. Do not include prose, markdown, XML, code fences, comments, or visible reasoning in the XPath value.
 """
 
 PROMPT_TEMPLATES = {
     "zero-shot": ZERO_SHOT_TEMPLATE,
     "few-shot": FEW_SHOT_TEMPLATE,
-    "multi-step": MULTI_STEP_TEMPLATE,
 }
+DSPY_PROMPT_STYLES = {"dspy-cot"}
+PROMPT_STYLE_CHOICES = sorted(set(PROMPT_TEMPLATES) | DSPY_PROMPT_STYLES)
 
 STOP_WORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "if", "in",
@@ -145,7 +116,7 @@ def tokenize_description(text: str) -> set[str]:
 def load_jsonl_records(path: str) -> list[dict]:
     """Load non-empty JSONL records from disk."""
     records = []
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8-sig") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -351,7 +322,8 @@ def parse_rate_limit_reset(response: requests.Response) -> float | None:
     if not match:
         return None
 
-    reset_at = datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    reset_at = datetime.strptime(match.group(
+        1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
     return max(0.0, (reset_at - datetime.now(timezone.utc)).total_seconds())
 
 
@@ -359,11 +331,13 @@ def post_with_retries(url: str, headers: dict, payload: dict, rule_key, args) ->
     """POST to the LLM API, waiting through rate limits and transient failures."""
     for attempt in range(1, args.max_retries + 2):
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=args.timeout)
+            response = requests.post(
+                url, headers=headers, json=payload, timeout=args.timeout)
         except requests.exceptions.ReadTimeout:
             if attempt > args.max_retries:
                 raise
-            wait_seconds = min(args.retry_max_wait, args.retry_base_wait * attempt)
+            wait_seconds = min(args.retry_max_wait,
+                               args.retry_base_wait * attempt)
             print(
                 f"Read timeout for ruleKey={rule_key}; retrying in {wait_seconds:.1f}s "
                 f"({attempt}/{args.max_retries})",
@@ -375,7 +349,8 @@ def post_with_retries(url: str, headers: dict, payload: dict, rule_key, args) ->
         if response.status_code == 429 and attempt <= args.max_retries:
             wait_seconds = parse_rate_limit_reset(response)
             if wait_seconds is None:
-                wait_seconds = min(args.retry_max_wait, args.retry_base_wait * attempt)
+                wait_seconds = min(args.retry_max_wait,
+                                   args.retry_base_wait * attempt)
             wait_seconds += args.rate_limit_buffer
             print(
                 f"HTTP 429 for ruleKey={rule_key}; waiting {wait_seconds:.1f}s before retry "
@@ -386,7 +361,8 @@ def post_with_retries(url: str, headers: dict, payload: dict, rule_key, args) ->
             continue
 
         if response.status_code in {500, 502, 503, 504} and attempt <= args.max_retries:
-            wait_seconds = min(args.retry_max_wait, args.retry_base_wait * attempt)
+            wait_seconds = min(args.retry_max_wait,
+                               args.retry_base_wait * attempt)
             print(
                 f"HTTP {response.status_code} for ruleKey={rule_key}; retrying in {wait_seconds:.1f}s "
                 f"({attempt}/{args.max_retries})",
@@ -398,6 +374,60 @@ def post_with_retries(url: str, headers: dict, payload: dict, rule_key, args) ->
         return response
 
     raise RuntimeError("unreachable retry state")
+
+
+def build_dspy_cot_program(args, api_key: str):
+    """Configure DSPy and return a ChainOfThought program for XPath generation."""
+    try:
+        import dspy
+    except ImportError as exc:
+        raise SystemExit(
+            "Prompt style 'dspy-cot' requires DSPy. Install it with: python -m pip install dspy"
+        ) from exc
+
+    lm_kwargs = {
+        "api_key": api_key,
+        "api_base": args.base_url,
+        "max_tokens": args.max_tokens,
+    }
+    if args.temperature is not None:
+        lm_kwargs["temperature"] = args.temperature
+
+    lm = dspy.LM(args.model, **lm_kwargs)
+    dspy.configure(lm=lm)
+    signature = dspy.Signature(
+        "rule : str -> xpath : str",
+        instructions=DSPY_COT_INSTRUCTIONS,
+    )
+    program = dspy.ChainOfThought(signature)
+    if args.dspy_program:
+        program.load(args.dspy_program)
+        print(f"Loaded DSPy program from {args.dspy_program}")
+    return program
+
+
+def run_dspy_with_retries(program, description: str, rule_key, args) -> str:
+    """Run a DSPy program with the same retry envelope as direct API calls."""
+    for attempt in range(1, args.max_retries + 2):
+        try:
+            prediction = program.predict(rule=description)
+            xpath = getattr(prediction, "xpath", None)
+            if xpath is None and isinstance(prediction, dict):
+                xpath = prediction.get("xpath")
+            return str(xpath or "").strip()
+        except Exception as exc:
+            if attempt > args.max_retries:
+                raise
+            wait_seconds = min(args.retry_max_wait,
+                               args.retry_base_wait * attempt)
+            print(
+                f"DSPy generation failed for ruleKey={rule_key}: {exc}; "
+                f"retrying in {wait_seconds:.1f}s ({attempt}/{args.max_retries})",
+                file=sys.stderr,
+            )
+            time.sleep(wait_seconds)
+
+    raise RuntimeError("unreachable DSPy retry state")
 
 
 def resolve_output_path(output_file: str, prompt_style: str) -> str:
@@ -439,12 +469,14 @@ def main() -> int:
                     help="Responses API only: text verbosity level")
     ap.add_argument("--omit-temperature", action="store_true",
                     help="Do not send the temperature parameter")
-    ap.add_argument("--prompt-style", choices=sorted(PROMPT_TEMPLATES.keys()), default="zero-shot",
+    ap.add_argument("--prompt-style", choices=PROMPT_STYLE_CHOICES, default="zero-shot",
                     help="Prompt template style to use")
     ap.add_argument("--catalog-path", default="config/pmd-official-rule-descriptions.jsonl",
                     help="PMD example source used to retrieve dynamic few-shot examples; accepts the cleaned descriptions JSONL or the full catalog JSON")
     ap.add_argument("--few-shot-count", type=int, default=5,
                     help="Number of retrieved few-shot examples to inject for few-shot prompting")
+    ap.add_argument("--dspy-program", default="",
+                    help="Optional saved DSPy program JSON to load for dspy-cot prompting")
     ap.add_argument("--api-key", default="API_KEY",
                     help="Environment variable name containing API key")
     ap.add_argument("--timeout", type=int, default=300,
@@ -475,10 +507,13 @@ def main() -> int:
     catalog_rules = []
     if args.prompt_style == "few-shot":
         catalog_rules = load_catalog_examples(args.catalog_path)
+    dspy_program = None
+    if args.prompt_style == "dspy-cot":
+        dspy_program = build_dspy_cot_program(args, api_key)
 
     # Open input and output files
     # Process each line of the input JSONL file (one rule per line)
-    with open(args.input_file, "r", encoding="utf-8") as fin, open(args.output_file, "w", encoding="utf-8") as fout:
+    with open(args.input_file, "r", encoding="utf-8-sig") as fin, open(args.output_file, "w", encoding="utf-8") as fout:
         processed_rules = 0
         for line in fin:
             line = line.strip()
@@ -503,49 +538,46 @@ def main() -> int:
                 if value is not None and str(value).strip()
             }
 
-            # Build the prompt by substituting the rule description into the template
-            prompt_template = PROMPT_TEMPLATES[args.prompt_style]
-            prompt = prompt_template.replace("{{RULE_DESCRIPTION}}", desc)
-            if args.prompt_style == "few-shot":
-                retrieved_examples = select_retrieved_examples(
-                    desc, catalog_rules, args.few_shot_count, excluded_ids)
-                example_labels = [
-                    str(example.get("catalogId")
-                        or example.get("id") or "<missing-id>")
-                    for example in retrieved_examples
-                ]
-                print(
-                    f"few-shot examples for ruleKey={rule_key}: {', '.join(example_labels)}"
-                )
-                prompt = prompt.replace(
-                    "{{RETRIEVED_EXAMPLES}}",
-                    format_retrieved_examples(retrieved_examples),
-                )
+            if args.prompt_style == "dspy-cot":
+                xpath = run_dspy_with_retries(
+                    dspy_program, desc, rule_key, args)
+            else:
+                # Build the prompt by substituting the rule description into the template
+                prompt_template = PROMPT_TEMPLATES[args.prompt_style]
+                prompt = prompt_template.replace("{{RULE_DESCRIPTION}}", desc)
+                if args.prompt_style == "few-shot":
+                    retrieved_examples = select_retrieved_examples(
+                        desc, catalog_rules, args.few_shot_count, excluded_ids)
+                    prompt = prompt.replace(
+                        "{{RETRIEVED_EXAMPLES}}",
+                        format_retrieved_examples(retrieved_examples),
+                    )
 
-            api_format = resolve_api_format(
-                args.base_url, args.model, args.api_format)
-            endpoint_path, payload = build_request(api_format, args, prompt)
-            url = args.base_url.rstrip("/") + endpoint_path
+                api_format = resolve_api_format(
+                    args.base_url, args.model, args.api_format)
+                endpoint_path, payload = build_request(
+                    api_format, args, prompt)
+                url = args.base_url.rstrip("/") + endpoint_path
 
-            # Send the request to the LLM API
-            r = post_with_retries(url, headers, payload, rule_key, args)
-            if not r.ok:
-                print(
-                    f"HTTP {r.status_code} for ruleKey = {rule_key}", file=sys.stderr)
-                print(r.text, file=sys.stderr)
-                r.raise_for_status()
+                # Send the request to the LLM API
+                r = post_with_retries(url, headers, payload, rule_key, args)
+                if not r.ok:
+                    print(
+                        f"HTTP {r.status_code} for ruleKey = {rule_key}", file=sys.stderr)
+                    print(r.text, file=sys.stderr)
+                    r.raise_for_status()
 
-            # Extract the generated text from the API response
-            data = r.json()
-            content = extract_content(api_format, data)
+                # Extract the generated text from the API response
+                data = r.json()
+                content = extract_content(api_format, data)
 
-            if content is None:
-                print("WARNING: No content returned for ruleKey =",
-                      rule_key, file=sys.stderr)
-                print(json.dumps(data, ensure_ascii=False), file=sys.stderr)
-                content = ""
+                if content is None:
+                    print("WARNING: No content returned for ruleKey =",
+                          rule_key, file=sys.stderr)
+                    print(json.dumps(data, ensure_ascii=False), file=sys.stderr)
+                    content = ""
 
-            xpath = str(content).strip()
+                xpath = str(content).strip()
 
             # Write the result as a single-line JSON object to the output file
             out = {"ruleKey": rule_key, "description": desc, "xpath": xpath}
