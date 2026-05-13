@@ -26,6 +26,10 @@ For multi-target experiments, use --ground-truth-root instead:
     --ground-truth-root out/catalog-runs \
     --catalog-path config/pmd-catalog.json \
     --out-dir out/analysis-summary
+
+The --ground-truth-root option accepts both official PMD catalog runs
+(catalog-run_<target>/results.jsonl) and custom ruleset runs
+(custom-run_<target>/results.jsonl).
 """
 
 
@@ -101,12 +105,23 @@ def load_ground_truth_index(gt_results_path: Path) -> tuple[dict[str, dict], Pat
     return {str(row["ruleKey"]): row for row in rows}, reports_dir
 
 
+def normalize_target_key(target_name: str) -> str:
+    """Normalize target names used in experiment paths and ground-truth folders."""
+    return target_name.strip().rstrip("_").lower()
+
+
 def load_ground_truth_by_target(ground_truth_root: Path) -> dict[str, tuple[dict[str, dict], Path]]:
-    """Load catalog-run_<target>/results.jsonl files keyed by target directory name."""
+    """Load per-target ground-truth results keyed by target directory name."""
     mapping = {}
-    for results_path in sorted(ground_truth_root.glob("catalog-run_*/results.jsonl")):
-        target_name = results_path.parent.name.removeprefix("catalog-run_")
-        mapping[target_name.lower()] = load_ground_truth_index(results_path)
+    patterns = ("catalog-run_*/results.jsonl", "custom-run_*/results.jsonl")
+    for pattern in patterns:
+        for results_path in sorted(ground_truth_root.glob(pattern)):
+            target_name = results_path.parent.name
+            for prefix in ("catalog-run_", "custom-run_"):
+                target_name = target_name.removeprefix(prefix)
+            ground_truth = load_ground_truth_index(results_path)
+            mapping[normalize_target_key(target_name)] = ground_truth
+            mapping[target_name.lower()] = ground_truth
     return mapping
 
 
@@ -118,7 +133,29 @@ def get_ground_truth_for_target(
     """Return the correct ground-truth index/report directory for one target."""
     if single_ground_truth is not None:
         return single_ground_truth
-    return ground_truth_by_target.get(target_name.lower())
+    return ground_truth_by_target.get(normalize_target_key(target_name))
+
+
+def resolve_ground_truth_report_path(
+    gt_row: dict,
+    gt_reports_dir: Path,
+    mapped_rule_id: str,
+    generated_rule_key: str,
+) -> Path:
+    """Resolve ground-truth PMD report paths for official and custom rulesets."""
+    candidates = [
+        gt_reports_dir / f"{mapped_rule_id}.json",
+        gt_reports_dir / f"{gt_row.get('ruleKey')}.json",
+        gt_reports_dir / f"{generated_rule_key}.json",
+    ]
+    report_path = gt_row.get("reportPath")
+    if report_path:
+        candidates.append(Path(str(report_path)))
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
 
 
 def parse_report_violations(report_path: Path, cache: dict[Path, dict]) -> dict:
@@ -386,6 +423,46 @@ def find_associated_run_spec(structural_results_path: Path, experiment_root: Pat
     return None
 
 
+def infer_shared_generation_spec(structural_results_path: Path, experiment_root: Path) -> dict | None:
+    """Infer run metadata for target-independent _generation structural outputs."""
+    parts = structural_results_path.resolve().parts
+    if "_generation" not in parts:
+        return None
+
+    generation_index = parts.index("_generation")
+    if len(parts) <= generation_index + 4:
+        return None
+
+    model = parts[generation_index + 2]
+    temperature_dir = parts[generation_index + 3]
+    run_count_dir = parts[generation_index + 4]
+    if not temperature_dir.startswith("temp_") or not run_count_dir.startswith("runCount_"):
+        return None
+
+    prompt_style = ""
+    generated_jsonl = structural_generated_jsonl_path(structural_results_path)
+    if generated_jsonl is not None:
+        prompt_style = generated_jsonl.parent.name
+
+    run_name = ""
+    try:
+        relative_parts = structural_results_path.resolve().relative_to(
+            experiment_root.resolve()).parts
+        if relative_parts:
+            run_name = relative_parts[0]
+    except ValueError:
+        pass
+
+    return {
+        "target": "",
+        "model": model.replace("_", "/"),
+        "promptStyle": prompt_style,
+        "temperature": temperature_dir.removeprefix("temp_"),
+        "runCount": run_count_dir.removeprefix("runCount_"),
+        "runName": run_name,
+    }
+
+
 def load_structural_rows(
     structural_results_path: Path | None,
     experiment_root: Path,
@@ -405,6 +482,8 @@ def load_structural_rows(
             generated_jsonl = structural_generated_jsonl_path(structural_file)
             if generated_jsonl is not None:
                 spec = specs_by_generated_jsonl.get(normalize_resolved_path(generated_jsonl))
+        if spec is None:
+            spec = infer_shared_generation_spec(structural_file, experiment_root)
         for row in read_json_records(structural_file):
             enriched = dict(row)
             # Structural result rows produced in batch mode do not always carry
@@ -631,7 +710,7 @@ def main() -> int:
     )
     if args.ground_truth_root and not ground_truth_by_target:
         raise SystemExit(
-            f"No catalog-run_<target>/results.jsonl files found under {args.ground_truth_root}"
+            f"No catalog-run_<target>/results.jsonl or custom-run_<target>/results.jsonl files found under {args.ground_truth_root}"
         )
     catalog_path = Path(args.catalog_path)
     catalog_index = load_catalog_rule_order(catalog_path)
@@ -687,7 +766,7 @@ def main() -> int:
             )
             continue
         gt_index, gt_reports_dir = ground_truth
-        gt_row = gt_index.get(str(mapped_rule_id))
+        gt_row = gt_index.get(str(mapped_rule_id)) or gt_index.get(str(row["ruleKey"]))
         if gt_row is None:
             # Without a ground-truth record there is no meaningful behavioral
             # comparison, but the row still counts toward the condition total.
@@ -736,8 +815,13 @@ def main() -> int:
 
         llm_report = parse_report_violations(
             llm_report_dir / f"{row['ruleKey']}.json", report_cache)
-        gt_report = parse_report_violations(
-            gt_reports_dir / f"{mapped_rule_id}.json", report_cache)
+        gt_report_path = resolve_ground_truth_report_path(
+            gt_row,
+            gt_reports_dir,
+            str(mapped_rule_id),
+            str(row["ruleKey"]),
+        )
+        gt_report = parse_report_violations(gt_report_path, report_cache)
         match_type = classify_behavior(llm_report, gt_report)
         llm_finding_count = report_finding_count(llm_report)
         gt_finding_count = report_finding_count(gt_report)

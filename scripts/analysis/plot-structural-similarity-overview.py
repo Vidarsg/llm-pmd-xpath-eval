@@ -63,6 +63,27 @@ def short_model_name(model: str) -> str:
     return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "")
 
 
+def condition_label(
+    key: tuple[str, str, str, str],
+    varying_fields: set[str],
+    *,
+    multiline: bool = True,
+) -> str:
+    """Build compact condition labels by only showing fields that vary."""
+    model, prompt_style, temperature, run_count = key
+    parts = []
+    if "model" in varying_fields or not varying_fields:
+        parts.append(short_model_name(model))
+    if "promptStyle" in varying_fields:
+        parts.append(prompt_style)
+    if "temperature" in varying_fields:
+        parts.append(f"T={temperature}")
+    if "runCount" in varying_fields:
+        parts.append(f"run {run_count}")
+    separator = "\n" if multiline else " / "
+    return separator.join(parts) if parts else short_model_name(model)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Plot a structural-similarity overview from summary CSV outputs."
@@ -93,28 +114,43 @@ def main() -> int:
 
     label = summary_rows[0].get("label", "Structural Similarity")
 
-    # Derive per-condition groups from the per-rule CSV. Include the model so
-    # runs from different LMs are not collapsed into one prompt/temp/run bucket.
+    # Derive per-condition groups from the per-rule CSV. Repeated runs are
+    # pooled so each model/prompt/temperature condition appears once.
+    all_grouped = defaultdict(list)
     grouped = defaultdict(list)
     for row in per_rule_rows:
-        if not str(row.get("structurallyComparable", "")).lower() == "true":
-            continue
         model = str(row.get("model", "all"))
         prompt_style = str(row.get("promptStyle", "all"))
         temperature = str(row.get("temperature", "all"))
-        run_count = str(row.get("runCount", "all"))
-        grouped[(model, prompt_style, temperature, run_count)].append(row)
+        key = (model, prompt_style, temperature)
+        all_grouped[key].append(row)
+        if not str(row.get("structurallyComparable", "")).lower() == "true":
+            continue
+        grouped[key].append(row)
 
-    if not grouped:
+    if not all_grouped:
         # Fall back to one combined group when the per-rule CSV has no prompt/temperature columns.
         comparable_rows = [row for row in per_rule_rows if str(
             row.get("structurallyComparable", "")).lower() == "true"]
-        grouped[("all", "all", "all", "all")] = comparable_rows
+        all_grouped[("all", "all", "all")] = per_rule_rows
+        grouped[("all", "all", "all")] = comparable_rows
 
-    ordered_keys = sorted(grouped.keys(), key=lambda item: (item[0], item[1], item[2], item[3]))
+    ordered_keys = sorted(all_grouped.keys(), key=lambda item: (
+        item[0], item[1], item[2]))
+    unique_models = {key[0] for key in ordered_keys}
+    unique_prompts = {key[1] for key in ordered_keys}
+    unique_temperatures = {str(key[2]) for key in ordered_keys}
+    varying_fields = set()
+    if len(unique_models) > 1:
+        varying_fields.add("model")
+    if len(unique_prompts) > 1:
+        varying_fields.add("promptStyle")
+    if len(unique_temperatures) > 1:
+        varying_fields.add("temperature")
+
     labels = [
-        f"{short_model_name(key[0])}\n{key[1]}\nT={key[2]}\nrun {key[3]}"
-        if key != ("all", "all", "all", "all")
+        condition_label((key[0], key[1], key[2], ""), varying_fields)
+        if key != ("all", "all", "all")
         else "all rules"
         for key in ordered_keys
     ]
@@ -129,7 +165,7 @@ def main() -> int:
     # Each condition gets a boxplot distribution plus mean component scores, so
     # spread and metric composition are visible in the same figure.
     for key in ordered_keys:
-        rows = grouped[key]
+        rows = grouped.get(key, [])
         overall_scores = sorted(
             float(row.get("overallStructuralSimilarity", 0.0)) for row in rows)
         node_scores = [float(row.get("nodeLabelJaccard", 0.0)) for row in rows]
@@ -137,14 +173,7 @@ def main() -> int:
         scalar_scores = [
             float(row.get("scalarFeatureSimilarity", 0.0)) for row in rows]
 
-        all_group_rows = [
-            row
-            for row in per_rule_rows
-            if str(row.get("model", "all")) == key[0]
-            and str(row.get("promptStyle", "all")) == key[1]
-            and str(row.get("temperature", "all")) == str(key[2])
-            and str(row.get("runCount", "all")) == str(key[3])
-        ]
+        all_group_rows = all_grouped.get(key, [])
         group_total = len(all_group_rows)
         group_comparable = len(rows)
         group_comparable_pct = 100.0 * group_comparable / \
@@ -161,16 +190,17 @@ def main() -> int:
         median_scores.append(percentile(overall_scores, 0.5)
                              if overall_scores else 0.0)
 
-    prompt_style_runs = sorted({(key[0], key[1], key[3]) for key in ordered_keys})
     temperatures = sorted({str(key[2]) for key in ordered_keys})
-    heatmap = np.full((len(prompt_style_runs), len(temperatures)), np.nan)
+    model_prompt_rows = sorted({(key[0], key[1]) for key in ordered_keys})
+    heatmap = np.full((len(model_prompt_rows), len(temperatures)), np.nan)
     for key, median in zip(ordered_keys, median_scores):
-        heatmap[prompt_style_runs.index(
-            (key[0], key[1], key[3])), temperatures.index(str(key[2]))] = median
+        heatmap[model_prompt_rows.index(
+            (key[0], key[1])), temperatures.index(str(key[2]))] = median
 
-    fig_width = max(11.0, len(labels) * 1.7)
+    fig_width = max(11.0, len(labels) * 1.45)
+    fig_height = max(8.5, len(model_prompt_rows) * 0.55 + 5.5)
     fig, axes = plt.subplots(2, 2, figsize=(
-        fig_width, 9), constrained_layout=True)
+        fig_width, fig_height), constrained_layout=True)
 
     ax = axes[0, 0]
     ax.bar(np.arange(len(labels)), comparable_pct, color="#4c9f70")
@@ -178,47 +208,56 @@ def main() -> int:
     ax.set_ylabel("Percent")
     ax.set_ylim(0, 100)
     ax.set_xticks(np.arange(len(labels)))
-    ax.set_xticklabels(labels, rotation=35, ha="right")
+    ax.set_xticklabels(labels, rotation=30, ha="right")
 
     ax = axes[0, 1]
     bp = ax.boxplot(
         overall_box_data,
         patch_artist=True,
-        widths=0.6,
+        widths=0.45,
         showfliers=False,
         whis=(0, 100),
     )
     for patch in bp["boxes"]:
         patch.set_facecolor("#8fb9d9")
         patch.set_alpha(0.9)
-    ax.set_title("Distribution of AST Similarity Scores")
+    ax.set_title("Distribution of Parsed AST Similarity Scores")
     ax.set_ylabel("Overall structural similarity")
     ax.set_ylim(0, 1)
     ax.set_xticks(range(1, len(labels) + 1))
-    ax.set_xticklabels(labels, rotation=35, ha="right")
+    ax.set_xticklabels(labels, rotation=30, ha="right")
 
     ax = axes[1, 0]
-    width = 0.24
+    width = 0.18
     xpos = np.arange(len(labels))
     ax.bar(xpos - width, mean_node, width=width, label="Node", color="#4c78a8")
     ax.bar(xpos, mean_edge, width=width, label="Edge", color="#f58518")
     ax.bar(xpos + width, mean_scalar, width=width,
            label="Scalar", color="#54a24b")
-    ax.set_title("Average AST Similarity Components")
+    ax.set_title("Average Parsed AST Similarity Components")
     ax.set_ylabel("Similarity")
     ax.set_ylim(0, 1)
     ax.set_xticks(xpos)
-    ax.set_xticklabels(labels, rotation=35, ha="right")
-    ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1.0))
+    ax.set_xticklabels(labels, rotation=30, ha="right")
+    ax.legend(frameon=False, fontsize=8, loc="upper left",
+              bbox_to_anchor=(1.01, 1.0))
 
     ax = axes[1, 1]
     image = ax.imshow(heatmap, cmap="Blues", vmin=0, vmax=1, aspect="auto")
-    ax.set_title("Median AST Similarity by Condition")
+    ax.set_title("Median Parsed AST Similarity by Condition")
     ax.set_xticks(np.arange(len(temperatures)))
     ax.set_xticklabels([f"T={value}" for value in temperatures])
-    ax.set_yticks(np.arange(len(prompt_style_runs)))
-    ax.set_yticklabels([f"{short_model_name(model)}\n{prompt}\nrun {run}" for model, prompt, run in prompt_style_runs])
-    for row_index in range(len(prompt_style_runs)):
+    ax.set_yticks(np.arange(len(model_prompt_rows)))
+    heatmap_fields = set()
+    if len({model for model, _ in model_prompt_rows}) > 1:
+        heatmap_fields.add("model")
+    if len({prompt for _, prompt in model_prompt_rows}) > 1:
+        heatmap_fields.add("promptStyle")
+    ax.set_yticklabels([
+        condition_label((model, prompt, "", ""), heatmap_fields)
+        for model, prompt in model_prompt_rows
+    ])
+    for row_index in range(len(model_prompt_rows)):
         for col_index in range(len(temperatures)):
             value = heatmap[row_index, col_index]
             if math.isnan(value):
