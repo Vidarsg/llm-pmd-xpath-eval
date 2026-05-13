@@ -76,8 +76,6 @@ def condition_label(
         parts.append(short_model_name(model))
     if "promptStyle" in varying_fields:
         parts.append(prompt_style)
-    if "temperature" in varying_fields:
-        parts.append(f"T={temperature}")
     if "runCount" in varying_fields:
         parts.append(f"run {run_count}")
     separator = "\n" if multiline else " / "
@@ -145,8 +143,8 @@ def main() -> int:
         varying_fields.add("model")
     if len(unique_prompts) > 1:
         varying_fields.add("promptStyle")
-    if len(unique_temperatures) > 1:
-        varying_fields.add("temperature")
+    # Temperature is intentionally omitted from labels; current experiments keep
+    # it fixed, and showing it makes the figures harder to read.
 
     labels = [
         condition_label((key[0], key[1], key[2], ""), varying_fields)
@@ -244,9 +242,9 @@ def main() -> int:
 
     ax = axes[1, 1]
     image = ax.imshow(heatmap, cmap="Blues", vmin=0, vmax=1, aspect="auto")
-    ax.set_title("Median Parsed AST Similarity by Condition")
+    ax.set_title("Median Parsed AST Similarity by Model")
     ax.set_xticks(np.arange(len(temperatures)))
-    ax.set_xticklabels([f"T={value}" for value in temperatures])
+    ax.set_xticklabels(["" for _value in temperatures])
     ax.set_yticks(np.arange(len(model_prompt_rows)))
     heatmap_fields = set()
     if len({model for model, _ in model_prompt_rows}) > 1:

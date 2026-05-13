@@ -61,6 +61,13 @@ def short_model_name(model: str) -> str:
     return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "")
 
 
+def ground_truth_only_label(*paths: str) -> str:
+    text = " ".join(str(path).lower() for path in paths)
+    if "jpinpoint" in text:
+        return "jPinpoint only"
+    return "PMD only"
+
+
 def row_label(row: dict, include_target: bool, include_model: bool) -> str:
     """Build a concise multi-line label for condition bars."""
     parts = []
@@ -69,7 +76,6 @@ def row_label(row: dict, include_target: bool, include_model: bool) -> str:
     if include_target:
         parts.append(str(row["target"]))
     parts.append(str(row["promptStyle"]))
-    parts.append(f"T={row['temperature']}")
     parts.append(f"run {row['runCount']}")
     return "\n".join(parts)
 
@@ -117,6 +123,12 @@ def main() -> int:
     )
     parser.add_argument("--out-figure", required=True, help="Output PNG path")
     args = parser.parse_args()
+    gt_only_label = ground_truth_only_label(
+        args.syntax_summary,
+        args.behavior_summary,
+        args.behavior_per_rule,
+        args.out_figure,
+    )
 
     try:
         import matplotlib
@@ -348,7 +360,7 @@ def main() -> int:
         (overlap_pct, "Overlap", "#72b7b2"),
         (file_level_pct, "File-level", "#f2cf5b"),
         (both_empty_pct, "Both empty", "#6aaed6"),
-        (gt_only_pct, "GT only", "#b279a2"),
+        (gt_only_pct, gt_only_label, "#b279a2"),
         (llm_only_pct, "LLM only", "#ff9da6"),
         (partial_file_overlap_pct, "Partial files", "#59a14f"),
         (different_files_pct, "Different files", "#e17c05"),
@@ -376,7 +388,7 @@ def main() -> int:
     ax.bar(xpos, partial_file_overlap_non_empty_pct,
            width=width, label="Partial files", color="#59a14f")
     ax.bar(xpos + width, gt_only_non_empty_pct,
-           width=width, label="GT only", color="#b279a2")
+           width=width, label=gt_only_label, color="#b279a2")
     ax.bar(xpos + 2 * width, llm_only_non_empty_pct,
            width=width, label="LLM only", color="#ff9da6")
     ax.bar(xpos + 3 * width, different_files_non_empty_pct + unmatched_non_empty_pct,

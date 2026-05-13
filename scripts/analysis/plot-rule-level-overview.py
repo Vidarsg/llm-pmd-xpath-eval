@@ -37,7 +37,14 @@ def ensure_parent(path: Path) -> None:
 def short_rule_name(rule: str, max_len: int = 34) -> str:
     if len(rule) <= max_len:
         return rule
-    return rule[: max_len - 1] + "…"
+    return rule[: max_len - 3] + "..."
+
+
+def ground_truth_only_label(*paths: str) -> str:
+    text = " ".join(str(path).lower() for path in paths)
+    if "jpinpoint" in text:
+        return "jPinpoint-only"
+    return "PMD-only"
 
 
 def as_int(row: dict, name: str) -> int:
@@ -67,6 +74,8 @@ def main() -> int:
     parser.add_argument("--out-figure", required=True)
     parser.add_argument("--top-n", type=int, default=10)
     args = parser.parse_args()
+    gt_only_label = ground_truth_only_label(
+        args.behavior_per_rule, args.out_figure)
 
     try:
         import matplotlib
@@ -130,9 +139,12 @@ def main() -> int:
     top_n = max(1, args.top_n)
     easiest = sorted(
         comparable_stats,
-        key=lambda stat: (stat["agreementPct"], -
-                          stat["nonComparablePct"], stat["catalogId"]),
-        reverse=True,
+        key=lambda stat: (
+            -stat["agreementPct"],
+            -stat["matchPct"],
+            stat["nonComparablePct"],
+            stat["catalogId"],
+        ),
     )[:top_n]
     most_gt_only = sorted(
         rule_stats, key=lambda stat: stat["gtOnlyPct"], reverse=True)[:top_n]
@@ -141,7 +153,7 @@ def main() -> int:
 
     fig_height = max(10.5, top_n * 0.45 + 5.0)
     fig, axes = plt.subplots(2, 2, figsize=(
-        14, fig_height), constrained_layout=True)
+        15, fig_height), constrained_layout=True)
 
     def barh_rules(ax, stats: list[dict], value_name: str, title: str, color: str, xlabel: str) -> None:
         labels = [short_rule_name(
@@ -177,7 +189,13 @@ def main() -> int:
         for y_pos, value in zip(y, totals):
             ax.text(value + 1, y_pos, f"{value:.1f}",
                     va="center", fontsize=8)
-        ax.legend(frameon=False, fontsize=8)
+        ax.legend(
+            frameon=False,
+            fontsize=8,
+            loc="upper left",
+            bbox_to_anchor=(1.02, 1.0),
+            borderaxespad=0.0,
+        )
 
     stacked_agreement_rules(
         axes[0, 0],
@@ -189,9 +207,9 @@ def main() -> int:
         axes[1, 0],
         most_gt_only,
         "gtOnlyPct",
-        "Rules Most Often Missed by LLMs",
+        f"Rules Most Often {gt_only_label}",
         "#e07a5f",
-        "GT-only % of all evaluations",
+        f"{gt_only_label} % of all evaluations",
     )
     barh_rules(
         axes[1, 1],

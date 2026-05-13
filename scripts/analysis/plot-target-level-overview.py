@@ -65,6 +65,13 @@ def short_model_name(model: str) -> str:
     return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "") if parts else model
 
 
+def ground_truth_only_label(*paths: str) -> str:
+    text = " ".join(str(path).lower() for path in paths)
+    if "jpinpoint" in text:
+        return "jPinpoint only"
+    return "PMD only"
+
+
 def condition_key(row: dict) -> tuple[str, str, str, str, str]:
     return (
         str(row.get("target", "")),
@@ -105,6 +112,8 @@ def main() -> int:
     parser.add_argument("--behavior-summary", required=True)
     parser.add_argument("--out-figure", required=True)
     args = parser.parse_args()
+    gt_only_label = ground_truth_only_label(
+        args.syntax_summary, args.behavior_summary, args.out_figure)
 
     try:
         import matplotlib
@@ -191,7 +200,7 @@ def main() -> int:
 
     ax = axes[1, 1]
     width = 0.38
-    ax.barh(x - width / 2, gt_only, height=width, label="GT only", color="#d95f02")
+    ax.barh(x - width / 2, gt_only, height=width, label=gt_only_label, color="#d95f02")
     ax.barh(x + width / 2, noncomparable, height=width, label="Non-comparable", color="#8c8c8c")
     ax.set_title("Target-Level Failure Pressure")
     ax.set_xlabel("Mean % of all rules")

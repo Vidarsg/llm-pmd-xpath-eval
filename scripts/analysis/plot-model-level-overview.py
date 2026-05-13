@@ -65,6 +65,13 @@ def short_model_name(model: str) -> str:
     return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "") if parts else model
 
 
+def ground_truth_only_label(*paths: str) -> str:
+    text = " ".join(str(path).lower() for path in paths)
+    if "jpinpoint" in text:
+        return "jPinpoint only"
+    return "PMD only"
+
+
 def condition_key(row: dict) -> tuple[str, str, str, str, str]:
     return (
         str(row.get("target", "")),
@@ -120,6 +127,8 @@ def main() -> int:
     parser.add_argument("--behavior-summary", required=True)
     parser.add_argument("--out-figure", required=True)
     args = parser.parse_args()
+    gt_only_label = ground_truth_only_label(
+        args.syntax_summary, args.behavior_summary, args.out_figure)
 
     try:
         import matplotlib
@@ -150,8 +159,8 @@ def main() -> int:
     ordered_keys = sorted(groups, key=lambda key: (
         short_model_name(key[0]), key[1], key[2]))
     labels = [
-        f"{short_model_name(model)}\n{prompt}\nT={temperature}"
-        for model, prompt, temperature in ordered_keys
+        f"{short_model_name(model)}\n{prompt}"
+        for model, prompt, _temperature in ordered_keys
     ]
     x = np.arange(len(labels))
 
@@ -211,7 +220,7 @@ def main() -> int:
     ax = axes[1, 0]
     width = 0.24
     ax.bar(x - width, gt_only_mean, width=width,
-           label="GT only", color="#d95f02")
+           label=gt_only_label, color="#d95f02")
     ax.bar(x, llm_only_mean, width=width, label="LLM only", color="#7570b3")
     ax.bar(x + width, noncomparable_mean, width=width,
            label="Non-comparable", color="#8c8c8c")
