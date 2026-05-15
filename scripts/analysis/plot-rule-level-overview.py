@@ -15,10 +15,10 @@ Usage example:
 MATCH_TYPES = {
     "exact",
     "overlap",
-    "file-level",
 }
 
 SIMILAR_TYPES = {
+    "file-level",
     "llm-superset",
     "gt-superset",
     "partial-file-overlap",

@@ -16,10 +16,10 @@ Usage example:
 MATCH_COLUMNS = [
     "exactCount",
     "overlapCount",
-    "fileLevelCount",
 ]
 
 SIMILAR_COLUMNS = [
+    "fileLevelCount",
     "llmSupersetCount",
     "gtSupersetCount",
     "partialFileOverlapCount",

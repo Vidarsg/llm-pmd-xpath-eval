@@ -325,7 +325,7 @@ def main() -> int:
             positive_non_empty = sum(
                 1
                 for row in rows
-                if str(row.get("matchType", "")) in {"exact", "overlap", "file-level"}
+                if str(row.get("matchType", "")) in {"exact", "overlap"}
             )
             heatmap[row_index, col_index] = 100.0 * \
                 positive_non_empty / len(rows)
