@@ -199,7 +199,7 @@ def main() -> int:
     ax = axes[0, 0]
     ax.bar(x, operational_mean, yerr=operational_err,
            capsize=3, color="#4c9f70")
-    ax.set_title("Executable Generated Rules by Model")
+    ax.set_title("Operational Validity by Model")
     ax.set_ylabel("Mean % across all targets/runs")
     ax.set_ylim(0, 100)
     ax.set_xticks(x)
@@ -207,10 +207,11 @@ def main() -> int:
 
     ax = axes[0, 1]
     ax.bar(x, match_mean, label="Match", color="#4c78a8")
-    ax.bar(x, similar_mean, bottom=match_mean, label="Similar", color="#72b7b2")
+    ax.bar(x, similar_mean, bottom=match_mean,
+           label="Similar", color="#72b7b2")
     ax.errorbar(x, positive_mean, yerr=positive_err,
                 fmt="none", ecolor="#333333", capsize=3, linewidth=1)
-    ax.set_title("Behavioral Match and Similarity on Non-Empty Cases")
+    ax.set_title("Behavioral Correspondence on Non-Empty Cases")
     ax.set_ylabel("Mean % across all targets/runs")
     ax.set_ylim(0, 100)
     ax.set_xticks(x)
@@ -223,7 +224,7 @@ def main() -> int:
            label=gt_only_label, color="#d95f02")
     ax.bar(x, llm_only_mean, width=width, label="LLM only", color="#7570b3")
     ax.bar(x + width, noncomparable_mean, width=width,
-           label="Non-comparable", color="#8c8c8c")
+           label="Config/Proc Errors", color="#8c8c8c")
     ax.set_title("Main Failure Modes by Model")
     ax.set_ylabel("Mean % of all rules")
     ax.set_ylim(0, 100)

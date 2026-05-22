@@ -103,8 +103,10 @@ def main() -> int:
         noncomparable = sum(1 for row in group_rows if row.get(
             "matchType") == "non-comparable")
         denominator = total - both_empty - noncomparable
-        match = sum(1 for row in group_rows if row.get("matchType") in MATCH_TYPES)
-        similar = sum(1 for row in group_rows if row.get("matchType") in SIMILAR_TYPES)
+        match = sum(1 for row in group_rows if row.get(
+            "matchType") in MATCH_TYPES)
+        similar = sum(1 for row in group_rows if row.get(
+            "matchType") in SIMILAR_TYPES)
         positive = match + similar
         gt_only = sum(1 for row in group_rows if row.get(
             "matchType") == "gt-only")
@@ -121,6 +123,8 @@ def main() -> int:
                 "category": category,
                 "total": total,
                 "denominator": denominator,
+                "matchCount": match,
+                "similarCount": similar,
                 "agreementPct": pct(positive, denominator),
                 "matchPct": pct(match, denominator),
                 "similarPct": pct(similar, denominator),
@@ -148,8 +152,39 @@ def main() -> int:
     )[:top_n]
     most_gt_only = sorted(
         rule_stats, key=lambda stat: stat["gtOnlyPct"], reverse=True)[:top_n]
+    most_noncomparable_top_n = max(top_n, 13)
     most_noncomparable = sorted(
-        rule_stats, key=lambda stat: stat["nonComparablePct"], reverse=True)[:top_n]
+        rule_stats, key=lambda stat: stat["nonComparablePct"], reverse=True)[:most_noncomparable_top_n]
+
+    category_groups = defaultdict(list)
+    for stat in rule_stats:
+        category = stat["category"].strip()
+        if category and category.lower() != "unknown":
+            category_groups[category].append(stat)
+
+    category_stats = []
+    for category, stats in category_groups.items():
+        denominator = sum(stat["denominator"] for stat in stats)
+        match = sum(stat["matchCount"] for stat in stats)
+        similar = sum(stat["similarCount"] for stat in stats)
+        positive = match + similar
+        category_stats.append(
+            {
+                "category": category,
+                "agreementPct": pct(positive, denominator),
+                "matchPct": pct(match, denominator),
+                "similarPct": pct(similar, denominator),
+                "denominator": denominator,
+            }
+        )
+    category_stats = sorted(
+        [stat for stat in category_stats if stat["denominator"] > 0],
+        key=lambda stat: (
+            -stat["agreementPct"],
+            -stat["matchPct"],
+            stat["category"],
+        ),
+    )
 
     fig_height = max(10.5, top_n * 0.45 + 5.0)
     fig, axes = plt.subplots(2, 2, figsize=(
@@ -181,7 +216,35 @@ def main() -> int:
         ax.barh(y, similar_values, left=match_values,
                 label="Similar", color="#72b7b2")
         ax.set_title(title)
-        ax.set_xlabel("match + similar % of non-empty comparable cases")
+        ax.set_xlabel(
+            "behavioral correspondence % of non-empty comparable cases")
+        ax.set_xlim(0, 100)
+        ax.set_yticks(y)
+        ax.set_yticklabels(labels, fontsize=8)
+        ax.invert_yaxis()
+        for y_pos, value in zip(y, totals):
+            ax.text(value + 1, y_pos, f"{value:.1f}",
+                    va="center", fontsize=8)
+        ax.legend(
+            frameon=False,
+            fontsize=8,
+            loc="upper left",
+            bbox_to_anchor=(1.02, 1.0),
+            borderaxespad=0.0,
+        )
+
+    def stacked_agreement_categories(ax, stats: list[dict], title: str) -> None:
+        labels = [stat["category"] for stat in stats]
+        match_values = [stat["matchPct"] for stat in stats]
+        similar_values = [stat["similarPct"] for stat in stats]
+        totals = [stat["agreementPct"] for stat in stats]
+        y = np.arange(len(stats))
+        ax.barh(y, match_values, label="Match", color="#4c78a8")
+        ax.barh(y, similar_values, left=match_values,
+                label="Similar", color="#72b7b2")
+        ax.set_title(title)
+        ax.set_xlabel(
+            "behavioral correspondence % of non-empty comparable cases")
         ax.set_xlim(0, 100)
         ax.set_yticks(y)
         ax.set_yticklabels(labels, fontsize=8)
@@ -200,9 +263,16 @@ def main() -> int:
     stacked_agreement_rules(
         axes[0, 0],
         easiest,
-        "Easiest Rules: Highest Match + Similarity",
+        "Rules with the Highest Behavioral Correspondence",
     )
-    axes[0, 1].axis("off")
+    if category_stats:
+        stacked_agreement_categories(
+            axes[0, 1],
+            category_stats,
+            "Highest Performing PMD Rule Categories",
+        )
+    else:
+        axes[0, 1].axis("off")
     barh_rules(
         axes[1, 0],
         most_gt_only,
@@ -215,9 +285,9 @@ def main() -> int:
         axes[1, 1],
         most_noncomparable,
         "nonComparablePct",
-        "Rules Most Often Non-Comparable",
+        "Rules Most Often Containing Errors",
         "#8c8c8c",
-        "non-comparable % of all evaluations",
+        "Error % of all rule evaluations",
     )
 
     fig.suptitle("Rule-Level Experiment Overview", fontsize=14)

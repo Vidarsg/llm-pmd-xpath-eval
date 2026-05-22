@@ -84,7 +84,8 @@ def condition_key(row: dict) -> tuple[str, str, str, str, str]:
 
 def non_empty_denominator(row: dict) -> int:
     total = as_int(row, "totalRules")
-    excluded = as_int(row, "bothEmptyCount") + as_int(row, "nonComparableCount")
+    excluded = as_int(row, "bothEmptyCount") + \
+        as_int(row, "nonComparableCount")
     return total - excluded
 
 
@@ -135,35 +136,48 @@ def main() -> int:
         if behavior_row is not None:
             merged_rows.append({**behavior_row, **syntax_row})
     if not merged_rows:
-        raise SystemExit("No overlapping target conditions found in summary CSVs.")
+        raise SystemExit(
+            "No overlapping target conditions found in summary CSVs.")
 
     target_groups = defaultdict(list)
     target_model_groups = defaultdict(list)
     for row in merged_rows:
         target_groups[str(row.get("target", ""))].append(row)
-        target_model_groups[(str(row.get("target", "")), str(row.get("model", "")))].append(row)
+        target_model_groups[(str(row.get("target", "")),
+                             str(row.get("model", "")))].append(row)
 
     targets = sorted(target_groups)
-    models = sorted({str(row.get("model", "")) for row in merged_rows}, key=short_model_name)
+    models = sorted({str(row.get("model", ""))
+                    for row in merged_rows}, key=short_model_name)
     target_labels = targets
     x = np.arange(len(targets))
 
-    operational = [mean([as_float(row, "operationallyValidPct") for row in target_groups[target]]) for target in targets]
-    match = [mean([grouped_pct(row, MATCH_COLUMNS) for row in target_groups[target]]) for target in targets]
-    similar = [mean([grouped_pct(row, SIMILAR_COLUMNS) for row in target_groups[target]]) for target in targets]
-    positive = [mean([positive_non_empty_pct(row) for row in target_groups[target]]) for target in targets]
-    gt_only = [mean([as_float(row, "gtOnlyPct") for row in target_groups[target]]) for target in targets]
-    noncomparable = [mean([as_float(row, "nonComparablePct") for row in target_groups[target]]) for target in targets]
+    operational = [mean([as_float(row, "operationallyValidPct")
+                        for row in target_groups[target]]) for target in targets]
+    match = [mean([grouped_pct(row, MATCH_COLUMNS)
+                  for row in target_groups[target]]) for target in targets]
+    similar = [mean([grouped_pct(row, SIMILAR_COLUMNS)
+                    for row in target_groups[target]]) for target in targets]
+    positive = [mean([positive_non_empty_pct(row)
+                     for row in target_groups[target]]) for target in targets]
+    gt_only = [mean([as_float(row, "gtOnlyPct")
+                    for row in target_groups[target]]) for target in targets]
+    llm_only = [mean([as_float(row, "llmOnlyPct")
+                     for row in target_groups[target]]) for target in targets]
+    noncomparable = [mean([as_float(row, "nonComparablePct")
+                          for row in target_groups[target]]) for target in targets]
 
     heatmap = np.zeros((len(targets), len(models)))
     for row_index, target in enumerate(targets):
         for col_index, model in enumerate(models):
             rows = target_model_groups.get((target, model), [])
-            heatmap[row_index, col_index] = mean([positive_non_empty_pct(row) for row in rows])
+            heatmap[row_index, col_index] = mean(
+                [positive_non_empty_pct(row) for row in rows])
 
     fig_height = max(8.0, len(targets) * 0.55 + 4.0)
     fig_width = max(11.0, len(models) * 1.1 + 7.0)
-    fig, axes = plt.subplots(2, 2, figsize=(fig_width, fig_height), constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(
+        fig_width, fig_height), constrained_layout=True)
 
     ax = axes[0, 0]
     ax.barh(x, operational, color="#4c9f70")
@@ -176,22 +190,25 @@ def main() -> int:
 
     ax = axes[0, 1]
     image = ax.imshow(heatmap, cmap="Blues", vmin=0, vmax=100, aspect="auto")
-    ax.set_title("Behavioral Agreement by Target and Model")
+    ax.set_title("Behavioral Correspondence by Target and Model")
     ax.set_xticks(np.arange(len(models)))
-    ax.set_xticklabels([short_model_name(model) for model in models], rotation=25, ha="right")
+    ax.set_xticklabels([short_model_name(model)
+                       for model in models], rotation=25, ha="right")
     ax.set_yticks(np.arange(len(targets)))
     ax.set_yticklabels(target_labels)
     for row_index in range(len(targets)):
         for col_index in range(len(models)):
             value = heatmap[row_index, col_index]
-            ax.text(col_index, row_index, f"{value:.0f}", ha="center", va="center", fontsize=8)
-    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="Positive non-empty agreement %")
+            ax.text(col_index, row_index,
+                    f"{value:.0f}", ha="center", va="center", fontsize=8)
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04,
+                 label="Mean % across all runs")
 
     ax = axes[1, 0]
     ax.barh(x, match, label="Match", color="#4c78a8")
     ax.barh(x, similar, left=match, label="Similar", color="#72b7b2")
-    ax.set_title("Behavioral Match and Similarity by Target")
-    ax.set_xlabel("Mean % on non-empty comparable cases")
+    ax.set_title("Behavioral Correspondence by Target")
+    ax.set_xlabel("Mean % across all models/runs")
     ax.set_xlim(0, 100)
     ax.set_yticks(x)
     ax.set_yticklabels(target_labels)
@@ -199,9 +216,12 @@ def main() -> int:
     ax.legend(frameon=False, fontsize=8)
 
     ax = axes[1, 1]
-    width = 0.38
-    ax.barh(x - width / 2, gt_only, height=width, label=gt_only_label, color="#d95f02")
-    ax.barh(x + width / 2, noncomparable, height=width, label="Non-comparable", color="#8c8c8c")
+    width = 0.24
+    ax.barh(x - width, gt_only, height=width,
+            label=gt_only_label, color="#d95f02")
+    ax.barh(x, llm_only, height=width, label="LLM only", color="#7570b3")
+    ax.barh(x + width, noncomparable, height=width,
+            label="Config/Proc Errors", color="#8c8c8c")
     ax.set_title("Target-Level Failure Pressure")
     ax.set_xlabel("Mean % of all rules")
     ax.set_xlim(0, 100)
