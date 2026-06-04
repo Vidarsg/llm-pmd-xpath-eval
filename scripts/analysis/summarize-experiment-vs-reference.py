@@ -5,29 +5,29 @@ import statistics
 from collections import Counter, defaultdict
 from pathlib import Path
 
-"""Summarize generated XPath experiments against ground-truth PMD behavior.
+"""Summarize generated XPath experiments against reference PMD behavior.
 
 The script combines validation outputs, PMD JSON reports, catalog metadata, and
 optional structural-similarity rows into CSV/Markdown tables suitable for
 analysis and thesis reporting.
 
 Usage example:
-  python scripts/analysis/summarize-experiment-vs-ground-truth.py \
+  python scripts/analysis/summarize-experiment-vs-reference.py \
     --aggregated-results out/experiments/experiment/aggregated-results.jsonl \
     --experiment-root out/experiments/experiment \
-    --ground-truth-results out/catalog-runs/catalog-run/results.jsonl \
+    --reference-results out/catalog-runs/catalog-run/results.jsonl \
     --catalog-path config/pmd-catalog.json \
     --out-dir out/analysis-summary
 
-For multi-target experiments, use --ground-truth-root instead:
-  python scripts/analysis/summarize-experiment-vs-ground-truth.py \
+For multi-target experiments, use --reference-root instead:
+  python scripts/analysis/summarize-experiment-vs-reference.py \
     --aggregated-results out/experiments/experiment/aggregated-results.jsonl \
     --experiment-root out/experiments/experiment \
-    --ground-truth-root out/catalog-runs \
+    --reference-root out/catalog-runs \
     --catalog-path config/pmd-catalog.json \
     --out-dir out/analysis-summary
 
-The --ground-truth-root option accepts both official PMD catalog runs
+The --reference-root option accepts both official PMD catalog runs
 (catalog-run_<target>/results.jsonl) and custom ruleset runs
 (custom-run_<target>/results.jsonl).
 """
@@ -98,57 +98,57 @@ def load_run_report_dirs(experiment_root: Path) -> dict[tuple[str, str, str, str
     return report_dirs
 
 
-def load_ground_truth_index(gt_results_path: Path) -> tuple[dict[str, dict], Path]:
-    """Load ground-truth rule metadata and resolve the sibling reports directory."""
-    rows = read_json_records(gt_results_path)
-    reports_dir = gt_results_path.parent / "reports"
+def load_reference_index(reference_results_path: Path) -> tuple[dict[str, dict], Path]:
+    """Load reference rule metadata and resolve the sibling reports directory."""
+    rows = read_json_records(reference_results_path)
+    reports_dir = reference_results_path.parent / "reports"
     return {str(row["ruleKey"]): row for row in rows}, reports_dir
 
 
 def normalize_target_key(target_name: str) -> str:
-    """Normalize target names used in experiment paths and ground-truth folders."""
+    """Normalize target names used in experiment paths and reference folders."""
     return target_name.strip().rstrip("_").lower()
 
 
-def load_ground_truth_by_target(ground_truth_root: Path) -> dict[str, tuple[dict[str, dict], Path]]:
-    """Load per-target ground-truth results keyed by target directory name."""
+def load_reference_by_target(reference_root: Path) -> dict[str, tuple[dict[str, dict], Path]]:
+    """Load per-target reference results keyed by target directory name."""
     mapping = {}
     patterns = ("catalog-run_*/results.jsonl", "custom-run_*/results.jsonl")
     for pattern in patterns:
-        for results_path in sorted(ground_truth_root.glob(pattern)):
+        for results_path in sorted(reference_root.glob(pattern)):
             target_name = results_path.parent.name
             for prefix in ("catalog-run_", "custom-run_"):
                 target_name = target_name.removeprefix(prefix)
-            ground_truth = load_ground_truth_index(results_path)
-            mapping[normalize_target_key(target_name)] = ground_truth
-            mapping[target_name.lower()] = ground_truth
+            reference = load_reference_index(results_path)
+            mapping[normalize_target_key(target_name)] = reference
+            mapping[target_name.lower()] = reference
     return mapping
 
 
-def get_ground_truth_for_target(
+def get_reference_for_target(
     target_name: str,
-    single_ground_truth: tuple[dict[str, dict], Path] | None,
-    ground_truth_by_target: dict[str, tuple[dict[str, dict], Path]],
+    single_reference: tuple[dict[str, dict], Path] | None,
+    reference_by_target: dict[str, tuple[dict[str, dict], Path]],
 ) -> tuple[dict[str, dict], Path] | None:
-    """Return the correct ground-truth index/report directory for one target."""
-    if single_ground_truth is not None:
-        return single_ground_truth
-    return ground_truth_by_target.get(normalize_target_key(target_name))
+    """Return the correct reference index/report directory for one target."""
+    if single_reference is not None:
+        return single_reference
+    return reference_by_target.get(normalize_target_key(target_name))
 
 
-def resolve_ground_truth_report_path(
-    gt_row: dict,
-    gt_reports_dir: Path,
+def resolve_reference_report_path(
+    reference_row: dict,
+    reference_reports_dir: Path,
     mapped_rule_id: str,
     generated_rule_key: str,
 ) -> Path:
-    """Resolve ground-truth PMD report paths for official and custom rulesets."""
+    """Resolve reference PMD report paths for official and custom rulesets."""
     candidates = [
-        gt_reports_dir / f"{mapped_rule_id}.json",
-        gt_reports_dir / f"{gt_row.get('ruleKey')}.json",
-        gt_reports_dir / f"{generated_rule_key}.json",
+        reference_reports_dir / f"{mapped_rule_id}.json",
+        reference_reports_dir / f"{reference_row.get('ruleKey')}.json",
+        reference_reports_dir / f"{generated_rule_key}.json",
     ]
-    report_path = gt_row.get("reportPath")
+    report_path = reference_row.get("reportPath")
     if report_path:
         candidates.append(Path(str(report_path)))
 
@@ -247,49 +247,49 @@ def all_spans_overlap(left: list[tuple[int, int, int, int]], right: list[tuple[i
     )
 
 
-def classify_behavior(llm_report: dict, gt_report: dict) -> str:
-    """Classify behavioral agreement between one LLM rule report and one ground-truth report."""
+def classify_behavior(llm_report: dict, reference_report: dict) -> str:
+    """Classify behavioral correspondence between one LLM rule report and one reference report."""
     # Behavioral comparison only makes sense when both PMD runs completed well
     # enough to produce trustworthy violation spans.
     if (
         llm_report["hadConfigErrors"]
         or llm_report["hadProcessingErrors"]
-        or gt_report["hadConfigErrors"]
-        or gt_report["hadProcessingErrors"]
+        or reference_report["hadConfigErrors"]
+        or reference_report["hadProcessingErrors"]
         or not llm_report["exists"]
-        or not gt_report["exists"]
+        or not reference_report["exists"]
     ):
         return "non-comparable"
 
     llm_files = llm_report["files"]
-    gt_files = gt_report["files"]
+    reference_files = reference_report["files"]
 
-    if not llm_files and not gt_files:
+    if not llm_files and not reference_files:
         return "both-empty"
     if not llm_files:
-        return "gt-only"
-    if not gt_files:
+        return "reference-only"
+    if not reference_files:
         return "llm-only"
 
     # Exact is strict span equality; overlap and file-level progressively relax
     # the comparison while still requiring the same affected files.
-    if llm_files == gt_files:
+    if llm_files == reference_files:
         return "exact"
 
-    if set(llm_files.keys()) == set(gt_files.keys()):
-        if all(all_spans_overlap(llm_files[name], gt_files[name]) for name in llm_files):
+    if set(llm_files.keys()) == set(reference_files.keys()):
+        if all(all_spans_overlap(llm_files[name], reference_files[name]) for name in llm_files):
             return "overlap"
         return "file-level"
 
     llm_file_set = set(llm_files.keys())
-    gt_file_set = set(gt_files.keys())
-    common_files = llm_file_set & gt_file_set
+    reference_file_set = set(reference_files.keys())
+    common_files = llm_file_set & reference_file_set
     if not common_files:
         return "different-files"
-    if gt_file_set < llm_file_set:
+    if reference_file_set < llm_file_set:
         return "llm-superset"
-    if llm_file_set < gt_file_set:
-        return "gt-superset"
+    if llm_file_set < reference_file_set:
+        return "reference-superset"
     return "partial-file-overlap"
 
 
@@ -531,7 +531,7 @@ def write_structural_similarity_summaries(
             "structurallyComparableCount": len(comparable_rows),
             "structurallyComparablePct": percent(len(comparable_rows), len(rows)),
             "llmParsedCount": sum(1 for row in rows if row.get("parseSuccessLlm")),
-            "groundTruthParsedCount": sum(1 for row in rows if row.get("parseSuccessGroundTruth")),
+            "referenceParsedCount": sum(1 for row in rows if row.get("parseSuccessReference")),
             "meanOverallStructuralSimilarity": mean_or_zero(overall_scores),
             "medianOverallStructuralSimilarity": median_or_zero(overall_scores),
             "minOverallStructuralSimilarity": min_or_zero(overall_scores),
@@ -579,7 +579,7 @@ def write_structural_similarity_summaries(
                 "structurallyComparableCount": len(condition_comparable),
                 "structurallyComparablePct": percent(len(condition_comparable), len(condition_rows)),
                 "llmParsedCount": sum(1 for row in condition_rows if row.get("parseSuccessLlm")),
-                "groundTruthParsedCount": sum(1 for row in condition_rows if row.get("parseSuccessGroundTruth")),
+                "referenceParsedCount": sum(1 for row in condition_rows if row.get("parseSuccessReference")),
                 "meanOverallStructuralSimilarity": mean_or_zero(condition_overall),
                 "medianOverallStructuralSimilarity": median_or_zero(condition_overall),
                 "minOverallStructuralSimilarity": min_or_zero(condition_overall),
@@ -602,9 +602,9 @@ def write_structural_similarity_summaries(
                 "temperature": row.get("temperature", ""),
                 "runCount": row.get("runCount", ""),
                 "ruleKey": row.get("ruleKey"),
-                "groundTruthRuleKey": row.get("groundTruthRuleKey"),
+                "referenceRuleKey": row.get("referenceRuleKey"),
                 "parseSuccessLlm": row.get("parseSuccessLlm"),
-                "parseSuccessGroundTruth": row.get("parseSuccessGroundTruth"),
+                "parseSuccessReference": row.get("parseSuccessReference"),
                 "structurallyComparable": row.get("structurallyComparable"),
                 "overallStructuralSimilarity": row.get("overallStructuralSimilarity", ""),
                 "nodeLabelJaccard": row.get("nodeLabelJaccard", ""),
@@ -626,7 +626,7 @@ def write_structural_similarity_summaries(
         "structurallyComparableCount",
         "structurallyComparablePct",
         "llmParsedCount",
-        "groundTruthParsedCount",
+        "referenceParsedCount",
         "meanOverallStructuralSimilarity",
         "medianOverallStructuralSimilarity",
         "minOverallStructuralSimilarity",
@@ -642,9 +642,9 @@ def write_structural_similarity_summaries(
         "temperature",
         "runCount",
         "ruleKey",
-        "groundTruthRuleKey",
+        "referenceRuleKey",
         "parseSuccessLlm",
-        "parseSuccessGroundTruth",
+        "parseSuccessReference",
         "structurallyComparable",
         "overallStructuralSimilarity",
         "nodeLabelJaccard",
@@ -672,16 +672,16 @@ def write_structural_similarity_summaries(
 
 
 def main() -> int:
-    """Load experiment outputs, compare them to ground truth, and emit thesis-ready summary tables."""
+    """Load experiment outputs, compare them to reference, and emit thesis-ready summary tables."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--aggregated-results", required=True,
                     help="Path to aggregated-results.jsonl")
     ap.add_argument("--experiment-root", required=True,
                     help="Experiment root containing run-spec.json files")
-    ap.add_argument("--ground-truth-results",
-                    help="Ground-truth results.jsonl path")
-    ap.add_argument("--ground-truth-root",
-                    help="Directory containing catalog-run_<target>/results.jsonl ground-truth runs")
+    ap.add_argument("--reference-results",
+                    help="Reference results.jsonl path")
+    ap.add_argument("--reference-root",
+                    help="Directory containing catalog-run_<target>/results.jsonl reference runs")
     ap.add_argument("--catalog-path", default="config/pmd-catalog.json",
                     help="PMD catalog JSON for numeric ruleKey to PMD id mapping")
     ap.add_argument("--structural-results",
@@ -691,26 +691,26 @@ def main() -> int:
     ap.add_argument("--out-dir", required=True,
                     help="Directory for summary tables")
     args = ap.parse_args()
-    if bool(args.ground_truth_results) == bool(args.ground_truth_root):
+    if bool(args.reference_results) == bool(args.reference_root):
         raise SystemExit(
-            "Specify exactly one of --ground-truth-results or --ground-truth-root"
+            "Specify exactly one of --reference-results or --reference-root"
         )
 
     aggregated_rows = read_json_records(Path(args.aggregated_results))
     run_report_dirs = load_run_report_dirs(Path(args.experiment_root))
-    single_ground_truth = (
-        load_ground_truth_index(Path(args.ground_truth_results))
-        if args.ground_truth_results
+    single_reference = (
+        load_reference_index(Path(args.reference_results))
+        if args.reference_results
         else None
     )
-    ground_truth_by_target = (
-        load_ground_truth_by_target(Path(args.ground_truth_root))
-        if args.ground_truth_root
+    reference_by_target = (
+        load_reference_by_target(Path(args.reference_root))
+        if args.reference_root
         else {}
     )
-    if args.ground_truth_root and not ground_truth_by_target:
+    if args.reference_root and not reference_by_target:
         raise SystemExit(
-            f"No catalog-run_<target>/results.jsonl or custom-run_<target>/results.jsonl files found under {args.ground_truth_root}"
+            f"No catalog-run_<target>/results.jsonl or custom-run_<target>/results.jsonl files found under {args.reference_root}"
         )
     catalog_path = Path(args.catalog_path)
     catalog_index = load_catalog_rule_order(catalog_path)
@@ -722,7 +722,7 @@ def main() -> int:
     behavior_per_rule_rows = []
 
     # First pass: count syntactic/execution outcomes from validation rows and
-    # compare each generated rule's PMD report to its ground-truth report.
+    # compare each generated rule's PMD report to its reference report.
     for row in aggregated_rows:
         group = row_group_key(row)
         syntax_counters[group]["totalRules"] += 1
@@ -741,12 +741,12 @@ def main() -> int:
             row["ruleKey"]).isdigit() else str(row["ruleKey"])
         rule_metadata = catalog_metadata.get(str(mapped_rule_id), {})
         rule_category = str(rule_metadata.get("category", "Unknown"))
-        ground_truth = get_ground_truth_for_target(
-            group[0], single_ground_truth, ground_truth_by_target)
-        if ground_truth is None:
+        reference = get_reference_for_target(
+            group[0], single_reference, reference_by_target)
+        if reference is None:
             # Multi-target mode requires a matching catalog run per target.
             # Keep the row visible as non-comparable instead of silently using
-            # the wrong repository's ground truth.
+            # the wrong repository's reference.
             behavior_counters[group]["totalRules"] += 1
             behavior_counters[group]["non-comparable"] += 1
             behavior_per_rule_rows.append(
@@ -760,15 +760,15 @@ def main() -> int:
                     "catalogId": mapped_rule_id,
                     "category": rule_category,
                     "llmFindingCount": "",
-                    "groundTruthFindingCount": "",
+                    "referenceFindingCount": "",
                     "matchType": "non-comparable",
                 }
             )
             continue
-        gt_index, gt_reports_dir = ground_truth
-        gt_row = gt_index.get(str(mapped_rule_id)) or gt_index.get(str(row["ruleKey"]))
-        if gt_row is None:
-            # Without a ground-truth record there is no meaningful behavioral
+        reference_index, reference_reports_dir = reference
+        reference_row = reference_index.get(str(mapped_rule_id)) or reference_index.get(str(row["ruleKey"]))
+        if reference_row is None:
+            # Without a reference record there is no meaningful behavioral
             # comparison, but the row still counts toward the condition total.
             behavior_counters[group]["totalRules"] += 1
             behavior_counters[group]["non-comparable"] += 1
@@ -783,7 +783,7 @@ def main() -> int:
                     "catalogId": mapped_rule_id,
                     "category": rule_category,
                     "llmFindingCount": "",
-                    "groundTruthFindingCount": "",
+                    "referenceFindingCount": "",
                     "matchType": "non-comparable",
                 }
             )
@@ -807,7 +807,7 @@ def main() -> int:
                     "catalogId": mapped_rule_id,
                     "category": rule_category,
                     "llmFindingCount": "",
-                    "groundTruthFindingCount": "",
+                    "referenceFindingCount": "",
                     "matchType": "non-comparable",
                 }
             )
@@ -815,16 +815,16 @@ def main() -> int:
 
         llm_report = parse_report_violations(
             llm_report_dir / f"{row['ruleKey']}.json", report_cache)
-        gt_report_path = resolve_ground_truth_report_path(
-            gt_row,
-            gt_reports_dir,
+        reference_report_path = resolve_reference_report_path(
+            reference_row,
+            reference_reports_dir,
             str(mapped_rule_id),
             str(row["ruleKey"]),
         )
-        gt_report = parse_report_violations(gt_report_path, report_cache)
-        match_type = classify_behavior(llm_report, gt_report)
+        reference_report = parse_report_violations(reference_report_path, report_cache)
+        match_type = classify_behavior(llm_report, reference_report)
         llm_finding_count = report_finding_count(llm_report)
-        gt_finding_count = report_finding_count(gt_report)
+        reference_finding_count = report_finding_count(reference_report)
         behavior_counters[group]["totalRules"] += 1
         behavior_counters[group][match_type] += 1
         behavior_per_rule_rows.append(
@@ -838,7 +838,7 @@ def main() -> int:
                 "catalogId": mapped_rule_id,
                 "category": rule_category,
                 "llmFindingCount": llm_finding_count,
-                "groundTruthFindingCount": gt_finding_count,
+                "referenceFindingCount": reference_finding_count,
                 "matchType": match_type,
             }
         )
@@ -871,11 +871,11 @@ def main() -> int:
     # one percentage column in the summary table.
     no_match_types = [
         "none",
-        "gt-only",
+        "reference-only",
         "llm-only",
         "different-files",
         "llm-superset",
-        "gt-superset",
+        "reference-superset",
         "partial-file-overlap",
     ]
     for group, counts in sorted(behavior_counters.items()):
@@ -897,16 +897,16 @@ def main() -> int:
                 "fileLevelPct": percent(counts["file-level"], total),
                 "bothEmptyCount": counts["both-empty"],
                 "bothEmptyPct": percent(counts["both-empty"], total),
-                "gtOnlyCount": counts["gt-only"],
-                "gtOnlyPct": percent(counts["gt-only"], total),
+                "referenceOnlyCount": counts["reference-only"],
+                "referenceOnlyPct": percent(counts["reference-only"], total),
                 "llmOnlyCount": counts["llm-only"],
                 "llmOnlyPct": percent(counts["llm-only"], total),
                 "differentFilesCount": counts["different-files"],
                 "differentFilesPct": percent(counts["different-files"], total),
                 "llmSupersetCount": counts["llm-superset"],
                 "llmSupersetPct": percent(counts["llm-superset"], total),
-                "gtSupersetCount": counts["gt-superset"],
-                "gtSupersetPct": percent(counts["gt-superset"], total),
+                "referenceSupersetCount": counts["reference-superset"],
+                "referenceSupersetPct": percent(counts["reference-superset"], total),
                 "partialFileOverlapCount": counts["partial-file-overlap"],
                 "partialFileOverlapPct": percent(counts["partial-file-overlap"], total),
                 "noMatchCount": no_match_count,
@@ -930,11 +930,11 @@ def main() -> int:
         "overlapCount", "overlapPct",
         "fileLevelCount", "fileLevelPct",
         "bothEmptyCount", "bothEmptyPct",
-        "gtOnlyCount", "gtOnlyPct",
+        "referenceOnlyCount", "referenceOnlyPct",
         "llmOnlyCount", "llmOnlyPct",
         "differentFilesCount", "differentFilesPct",
         "llmSupersetCount", "llmSupersetPct",
-        "gtSupersetCount", "gtSupersetPct",
+        "referenceSupersetCount", "referenceSupersetPct",
         "partialFileOverlapCount", "partialFileOverlapPct",
         "noMatchCount", "noMatchPct",
         "nonComparableCount", "nonComparablePct",
@@ -949,7 +949,7 @@ def main() -> int:
         "catalogId",
         "category",
         "llmFindingCount",
-        "groundTruthFindingCount",
+        "referenceFindingCount",
         "matchType",
     ]
 

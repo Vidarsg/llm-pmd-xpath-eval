@@ -3,7 +3,7 @@
 # Writes JSONL: {"ruleKey":"...","description":"...","xpath":"..."}
 #
 # Usage:
-#   set API_KEY=<personal api key>
+#   set API_KEY=<api key>
 #   python .\scripts\generation\llm-xpath-generator.py --in <input JSONL file location> --out <output JSONL file location>
 #     --base-url <LLM API base URL> --model <model identifier> --prompt-style <prompt style> --temperature <sampling temperature>
 #     --max-tokens <maximum tokens in response> --max-rules <maximum number of rules to process, 0 for all>

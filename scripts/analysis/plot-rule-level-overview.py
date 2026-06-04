@@ -3,7 +3,7 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
-"""Plot rule-level difficulty from behavioral agreement per-rule rows.
+"""Plot rule-level difficulty from behavioral correspondence per-rule rows.
 
 Usage example:
   python scripts/analysis/plot-rule-level-overview.py \
@@ -20,7 +20,7 @@ MATCH_TYPES = {
 SIMILAR_TYPES = {
     "file-level",
     "llm-superset",
-    "gt-superset",
+    "reference-superset",
     "partial-file-overlap",
 }
 
@@ -40,7 +40,7 @@ def short_rule_name(rule: str, max_len: int = 34) -> str:
     return rule[: max_len - 3] + "..."
 
 
-def ground_truth_only_label(*paths: str) -> str:
+def reference_only_label(*paths: str) -> str:
     text = " ".join(str(path).lower() for path in paths)
     if "jpinpoint" in text:
         return "jPinpoint-only"
@@ -74,7 +74,7 @@ def main() -> int:
     parser.add_argument("--out-figure", required=True)
     parser.add_argument("--top-n", type=int, default=10)
     args = parser.parse_args()
-    gt_only_label = ground_truth_only_label(
+    reference_only_label_text = reference_only_label(
         args.behavior_per_rule, args.out_figure)
 
     try:
@@ -108,12 +108,12 @@ def main() -> int:
         similar = sum(1 for row in group_rows if row.get(
             "matchType") in SIMILAR_TYPES)
         positive = match + similar
-        gt_only = sum(1 for row in group_rows if row.get(
-            "matchType") == "gt-only")
+        reference_only = sum(1 for row in group_rows if row.get(
+            "matchType") == "reference-only")
         llm_only = sum(1 for row in group_rows if row.get(
             "matchType") == "llm-only")
-        gt_nonempty = sum(1 for row in group_rows if as_int(
-            row, "groundTruthFindingCount") > 0)
+        reference_nonempty = sum(1 for row in group_rows if as_int(
+            row, "referenceFindingCount") > 0)
         llm_nonempty = sum(1 for row in group_rows if as_int(
             row, "llmFindingCount") > 0)
         rule_stats.append(
@@ -128,10 +128,10 @@ def main() -> int:
                 "agreementPct": pct(positive, denominator),
                 "matchPct": pct(match, denominator),
                 "similarPct": pct(similar, denominator),
-                "gtOnlyPct": pct(gt_only, total),
+                "referenceOnlyPct": pct(reference_only, total),
                 "llmOnlyPct": pct(llm_only, total),
                 "nonComparablePct": pct(noncomparable, total),
-                "gtNonEmptyPct": pct(gt_nonempty, total),
+                "referenceNonEmptyPct": pct(reference_nonempty, total),
                 "llmNonEmptyPct": pct(llm_nonempty, total),
             }
         )
@@ -150,8 +150,8 @@ def main() -> int:
             stat["catalogId"],
         ),
     )[:top_n]
-    most_gt_only = sorted(
-        rule_stats, key=lambda stat: stat["gtOnlyPct"], reverse=True)[:top_n]
+    most_reference_only = sorted(
+        rule_stats, key=lambda stat: stat["referenceOnlyPct"], reverse=True)[:top_n]
     most_noncomparable_top_n = max(top_n, 13)
     most_noncomparable = sorted(
         rule_stats, key=lambda stat: stat["nonComparablePct"], reverse=True)[:most_noncomparable_top_n]
@@ -275,11 +275,11 @@ def main() -> int:
         axes[0, 1].axis("off")
     barh_rules(
         axes[1, 0],
-        most_gt_only,
-        "gtOnlyPct",
-        f"Rules Most Often {gt_only_label}",
+        most_reference_only,
+        "referenceOnlyPct",
+        f"Rules Most Often {reference_only_label_text}",
         "#e07a5f",
-        f"{gt_only_label} % of all evaluations",
+        f"{reference_only_label_text} % of all evaluations",
     )
     barh_rules(
         axes[1, 1],

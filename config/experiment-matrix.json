@@ -5,17 +5,152 @@
   "validatorScript": "scripts/pmd/validate-llm-generated-xpaths.ps1",
   "runs": [
     {
+      "name": "Official-PMD_AllTargets_AllModels_Zero-Shot",
+      "inputRules": "config/pmd-official-rule-descriptions.jsonl",
+      "targets": [
+        "targets/commons-lang",
+        "targets/dropwizard",
+        "targets/immutables",
+        "targets/jdbi",
+        "targets/junit4",
+        "targets/liquibase",
+        "targets/picocli",
+        "targets/WebGoat"
+      ],
+      "models": [
+        {
+          "name": "google/gemma-4-31B-it",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "openai/gpt-oss-120b",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "Qwen/Qwen3.5-122B-A10B-FP8",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "mistralai/Mistral-Large-3-675B-Instruct-2512-NVFP4",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        }
+      ],
+      "promptStyles": [
+        "zero-shot"
+      ],
+      "temperatures": [
+        0.7
+      ],
+      "runCount": 3,
+      "maxRules": 0,
+      "maxTokens": 1500
+    },
+    {
+      "name": "Official-PMD_AllTargets_AllModels_Few-Shot",
+      "inputRules": "config/pmd-official-rule-descriptions.jsonl",
+      "targets": [
+        "targets/commons-lang",
+        "targets/dropwizard",
+        "targets/immutables",
+        "targets/jdbi",
+        "targets/junit4",
+        "targets/liquibase",
+        "targets/picocli",
+        "targets/WebGoat"
+      ],
+      "models": [
+        {
+          "name": "google/gemma-4-31B-it",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "openai/gpt-oss-120b",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "Qwen/Qwen3.5-122B-A10B-FP8",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "mistralai/Mistral-Large-3-675B-Instruct-2512-NVFP4",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        }
+      ],
+      "promptStyles": [
+        "few-shot"
+      ],
+      "temperatures": [
+        0.7
+      ],
+      "runCount": 3,
+      "maxRules": 0,
+      "maxTokens": 1500
+    },
+    {
+      "name": "jPinpoint_AllTargets_AllModels_Zero-Shot",
+      "inputRules": "config/custom-rulesets/jPinpoint/jpinpoint-rule-descriptions.jsonl",
+      "targets": [
+        "targets/commons-lang",
+        "targets/dropwizard",
+        "targets/immutables",
+        "targets/jdbi",
+        "targets/junit4",
+        "targets/liquibase",
+        "targets/picocli",
+        "targets/WebGoat"
+      ],
+      "models": [
+        {
+          "name": "google/gemma-4-31B-it",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "openai/gpt-oss-120b",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "Qwen/Qwen3.5-122B-A10B-FP8",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        },
+        {
+          "name": "mistralai/Mistral-Large-3-675B-Instruct-2512-NVFP4",
+          "baseUrl": "https://llm.hpc.ntnu.no/",
+          "apiKeyEnv": "API_KEY"
+        }
+      ],
+      "promptStyles": [
+        "zero-shot"
+      ],
+      "temperatures": [
+        0.7
+      ],
+      "runCount": 3,
+      "maxRules": 0,
+      "maxTokens": 1500
+    },
+    {
       "name": "jPinpoint_AllTargets_AllModels_Few-Shot",
       "inputRules": "config/custom-rulesets/jPinpoint/jpinpoint-rule-descriptions.jsonl",
       "targets": [
-        "C:/users/vidar/desktop/commons-lang",
-        "C:/users/vidar/desktop/dropwizard",
-        "C:/users/vidar/desktop/immutables",
-        "C:/users/vidar/desktop/jdbi",
-        "C:/users/vidar/desktop/junit4",
-        "C:/users/vidar/desktop/liquibase",
-        "C:/users/vidar/desktop/picocli",
-        "C:/users/vidar/desktop/WebGoat"
+        "targets/commons-lang",
+        "targets/dropwizard",
+        "targets/immutables",
+        "targets/jdbi",
+        "targets/junit4",
+        "targets/liquibase",
+        "targets/picocli",
+        "targets/WebGoat"
       ],
       "models": [
         {

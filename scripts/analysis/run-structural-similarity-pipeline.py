@@ -6,13 +6,13 @@ from pathlib import Path
 """Run the complete structural-similarity pipeline.
 
 This script glues together the Java/Saxon XPath AST parser and the Python
-similarity calculator. It supports a single generated/ground-truth pair or an
+similarity calculator. It supports a single generated/reference pair or an
 entire experiment tree containing generation/**/generated.jsonl files.
 
 Usage example:
   python scripts/analysis/run-structural-similarity-pipeline.py \
     --experiment-root out/experiments/experiment \
-    --ground-truth-asts config/pmd-official-rule-asts.jsonl \
+    --reference-asts config/pmd-official-rule-asts.jsonl \
     --catalog-path config/pmd-catalog.json
 """
 
@@ -92,7 +92,7 @@ def compute_similarity(
     python_exe: str,
     similarity_script: Path,
     llm_asts: Path,
-    gt_asts: Path,
+    reference_asts: Path,
     catalog_path: Path,
     output_jsonl: Path,
     force: bool,
@@ -109,8 +109,8 @@ def compute_similarity(
             str(similarity_script),
             "--llm-asts",
             str(llm_asts),
-            "--ground-truth-asts",
-            str(gt_asts),
+            "--reference-asts",
+            str(reference_asts),
             "--catalog-path",
             str(catalog_path),
             "--out",
@@ -129,33 +129,33 @@ def process_pair(
     similarity_script: Path,
     catalog_path: Path,
     llm_xpaths: Path,
-    gt_xpaths: Path | None,
-    gt_asts_source: Path | None,
+    reference_xpaths: Path | None,
+    reference_asts_source: Path | None,
     out_dir: Path,
     force: bool,
 ) -> None:
-    """Run AST parsing and structural comparison for one LLM/GT XPath pair."""
+    """Run AST parsing and structural comparison for one LLM/reference XPath pair."""
     llm_asts = out_dir / "llm-xpath-asts.jsonl"
     similarity = out_dir / "structural-similarity.jsonl"
 
-    # Ground-truth ASTs can be reused across many experiment runs, but generated
+    # Reference ASTs can be reused across many experiment runs, but generated
     # XPath files are parsed per run because they carry run metadata.
     parse_xpath_file(repo_root, java_exe, parser_jar,
                      llm_xpaths, llm_asts, force)
-    if gt_asts_source is not None:
-        gt_asts = gt_asts_source
-    elif gt_xpaths is not None:
-        gt_asts = out_dir / "gt-xpath-asts.jsonl"
+    if reference_asts_source is not None:
+        reference_asts = reference_asts_source
+    elif reference_xpaths is not None:
+        reference_asts = out_dir / "reference-xpath-asts.jsonl"
         parse_xpath_file(repo_root, java_exe, parser_jar,
-                         gt_xpaths, gt_asts, force)
+                         reference_xpaths, reference_asts, force)
     else:
-        raise ValueError("Either gt_xpaths or gt_asts_source must be provided")
+        raise ValueError("Either reference_xpaths or reference_asts_source must be provided")
     compute_similarity(
         repo_root,
         python_exe,
         similarity_script,
         llm_asts,
-        gt_asts,
+        reference_asts,
         catalog_path,
         similarity,
         force,
@@ -189,10 +189,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--llm-xpaths", help="Single LLM-generated XPath JSONL input")
-    parser.add_argument("--ground-truth-xpaths",
-                        help="Ground-truth XPath JSONL input")
-    parser.add_argument("--ground-truth-asts",
-                        help="Precomputed ground-truth AST JSONL input")
+    parser.add_argument("--reference-xpaths",
+                        help="Reference XPath JSONL input")
+    parser.add_argument("--reference-asts",
+                        help="Precomputed reference AST JSONL input")
     parser.add_argument(
         "--out-dir", help="Output directory for single-pair mode")
     parser.add_argument(
@@ -220,30 +220,30 @@ def main() -> int:
 
     build_parser_if_needed(repo_root, parser_jar, args.skip_build)
 
-    if args.ground_truth_xpaths and args.ground_truth_asts:
+    if args.reference_xpaths and args.reference_asts:
         raise ValueError(
-            "Use either --ground-truth-xpaths or --ground-truth-asts, not both")
-    gt_xpaths_arg = Path(args.ground_truth_xpaths).resolve(
-    ) if args.ground_truth_xpaths else None
-    gt_asts_arg = Path(args.ground_truth_asts).resolve(
-    ) if args.ground_truth_asts else None
+            "Use either --reference-xpaths or --reference-asts, not both")
+    reference_xpaths_arg = Path(args.reference_xpaths).resolve(
+    ) if args.reference_xpaths else None
+    reference_asts_arg = Path(args.reference_asts).resolve(
+    ) if args.reference_asts else None
 
     single_mode = bool(
-        args.llm_xpaths or args.ground_truth_xpaths or args.out_dir)
+        args.llm_xpaths or args.reference_xpaths or args.out_dir)
     batch_mode = bool(args.experiment_root)
 
     # Keep the modes mutually exclusive so output layout is predictable.
     if single_mode and batch_mode:
         raise ValueError(
-            "Use either single-pair mode (--llm-xpaths/--ground-truth-xpaths/--out-dir) or --experiment-root, not both")
+            "Use either single-pair mode (--llm-xpaths/--reference-xpaths/--out-dir) or --experiment-root, not both")
 
     if single_mode:
         if not args.llm_xpaths or not args.out_dir:
             raise ValueError(
                 "Single-pair mode requires --llm-xpaths and --out-dir")
-        if gt_xpaths_arg is None and gt_asts_arg is None:
+        if reference_xpaths_arg is None and reference_asts_arg is None:
             raise ValueError(
-                "Single-pair mode requires either --ground-truth-xpaths or --ground-truth-asts")
+                "Single-pair mode requires either --reference-xpaths or --reference-asts")
 
         process_pair(
             repo_root,
@@ -253,8 +253,8 @@ def main() -> int:
             similarity_script=similarity_script,
             catalog_path=catalog_path,
             llm_xpaths=Path(args.llm_xpaths).resolve(),
-            gt_xpaths=gt_xpaths_arg,
-            gt_asts_source=gt_asts_arg,
+            reference_xpaths=reference_xpaths_arg,
+            reference_asts_source=reference_asts_arg,
             out_dir=Path(args.out_dir).resolve(),
             force=args.force,
         )
@@ -268,9 +268,9 @@ def main() -> int:
         if not generated_files:
             raise FileNotFoundError(
                 f"No generated.jsonl files found under {experiment_root}")
-        if gt_xpaths_arg is None and gt_asts_arg is None:
+        if reference_xpaths_arg is None and reference_asts_arg is None:
             raise ValueError(
-                "Batch mode requires either --ground-truth-xpaths or --ground-truth-asts")
+                "Batch mode requires either --reference-xpaths or --reference-asts")
 
         print(
             f"Found {len(generated_files)} generated JSONL file(s) under {experiment_root}")
@@ -285,8 +285,8 @@ def main() -> int:
                 similarity_script=similarity_script,
                 catalog_path=catalog_path,
                 llm_xpaths=generated_jsonl,
-                gt_xpaths=gt_xpaths_arg,
-                gt_asts_source=gt_asts_arg,
+                reference_xpaths=reference_xpaths_arg,
+                reference_asts_source=reference_asts_arg,
                 out_dir=structural_dir,
                 force=args.force,
             )

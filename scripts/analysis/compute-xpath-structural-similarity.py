@@ -7,12 +7,12 @@ from pathlib import Path
 
 The Java parser emits a deliberately small AST schema. This script turns those
 trees into comparable feature sets and writes one similarity row per generated
-rule, paired against its ground-truth rule.
+rule, paired against its reference rule.
 
 Usage example:
   python scripts/analysis/compute-xpath-structural-similarity.py \
     --llm-asts out/experiments/experiment/run/structural/llm-xpath-asts.jsonl \
-    --ground-truth-asts config/pmd-official-rule-asts.jsonl \
+    --reference-asts config/pmd-official-rule-asts.jsonl \
     --catalog-path config/pmd-catalog.json \
     --out out/experiments/experiment/run/structural/structural-similarity.jsonl
 """
@@ -173,8 +173,8 @@ def compute_similarity(left_ast: dict, right_ast: dict) -> dict:
     }
 
 
-def pair_ground_truth_rule_key(llm_row: dict, gt_rows: dict[str, dict], catalog_index: dict[int, str]) -> str | None:
-    """Resolve the matching ground-truth key, preferring direct id matches over catalog remapping."""
+def pair_reference_rule_key(llm_row: dict, reference_rows: dict[str, dict], catalog_index: dict[int, str]) -> str | None:
+    """Resolve the matching reference key, preferring direct id matches over catalog remapping."""
     # Generated rows may carry a PMD id directly, or they may carry the numeric
     # position from the original input file. Try direct identifiers first.
     direct_candidates = []
@@ -184,17 +184,17 @@ def pair_ground_truth_rule_key(llm_row: dict, gt_rows: dict[str, dict], catalog_
             direct_candidates.append(str(value))
 
     for candidate in direct_candidates:
-        if candidate in gt_rows:
+        if candidate in reference_rows:
             return candidate
 
     llm_rule_key = llm_row.get("ruleKey")
     text = str(llm_rule_key)
     if text.isdigit():
         mapped = str(catalog_index[int(text)])
-        if mapped in gt_rows:
+        if mapped in reference_rows:
             return mapped
         return mapped
-    return text if text in gt_rows else text
+    return text if text in reference_rows else text
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
@@ -210,8 +210,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--llm-asts", required=True,
                     help="JSONL file with normalized ASTs for LLM-generated XPath rules")
-    ap.add_argument("--ground-truth-asts", required=True,
-                    help="JSONL file with normalized ASTs for ground-truth XPath rules")
+    ap.add_argument("--reference-asts", required=True,
+                    help="JSONL file with normalized ASTs for reference XPath rules")
     ap.add_argument("--catalog-path", default="config/pmd-catalog.json",
                     help="PMD catalog used to map numeric LLM rule keys to PMD ids")
     ap.add_argument("--out", required=True,
@@ -220,37 +220,37 @@ def main() -> int:
 
     catalog_index = load_catalog_rule_order(Path(args.catalog_path))
     llm_rows = read_json_records(Path(args.llm_asts))
-    gt_rows = {str(row["ruleKey"]): row for row in read_json_records(
-        Path(args.ground_truth_asts))}
+    reference_rows = {str(row["ruleKey"]): row for row in read_json_records(
+        Path(args.reference_asts))}
 
     output_rows = []
     for llm_row in llm_rows:
-        gt_rule_key = pair_ground_truth_rule_key(
-            llm_row, gt_rows, catalog_index)
-        gt_row = gt_rows.get(gt_rule_key)
+        reference_rule_key = pair_reference_rule_key(
+            llm_row, reference_rows, catalog_index)
+        reference_row = reference_rows.get(reference_rule_key)
 
         # Keep a row even when comparison is impossible so parse failures and
-        # missing ground-truth mappings remain visible in downstream summaries.
+        # missing reference mappings remain visible in downstream summaries.
         out_row = {
             "ruleKey": llm_row["ruleKey"],
-            "groundTruthRuleKey": gt_rule_key,
+            "referenceRuleKey": reference_rule_key,
             "xpath": llm_row.get("xpath"),
             "parseSuccessLlm": bool(llm_row.get("parseSuccess")),
-            "parseSuccessGroundTruth": bool(gt_row and gt_row.get("parseSuccess")),
+            "parseSuccessReference": bool(reference_row and reference_row.get("parseSuccess")),
             "structurallyComparable": False,
         }
 
-        if not gt_row:
-            out_row["comparisonError"] = "Ground-truth AST record not found"
+        if not reference_row:
+            out_row["comparisonError"] = "Reference AST record not found"
             output_rows.append(out_row)
             continue
 
-        if not llm_row.get("parseSuccess") or not gt_row.get("parseSuccess"):
+        if not llm_row.get("parseSuccess") or not reference_row.get("parseSuccess"):
             out_row["comparisonError"] = "One or both XPath expressions did not parse successfully"
             output_rows.append(out_row)
             continue
 
-        similarity = compute_similarity(llm_row["ast"], gt_row["ast"])
+        similarity = compute_similarity(llm_row["ast"], reference_row["ast"])
         out_row["structurallyComparable"] = True
         out_row.update(similarity)
         output_rows.append(out_row)

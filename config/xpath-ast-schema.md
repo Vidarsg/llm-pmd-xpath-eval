@@ -1,7 +1,7 @@
 # XPath AST Schema
 
 This schema defines the normalized AST format used for structural similarity
-comparisons between generated PMD XPath rules and ground-truth rules.
+comparisons between generated PMD XPath rules and reference rules.
 
 The goal is not to preserve every parser-specific detail. The goal is to retain
 stable structural information that can be compared across equivalent parses.
@@ -39,7 +39,7 @@ Each input record should be one JSON object per line:
 ## Required Top-Level Fields
 
 - `ruleKey`
-  - Stable identifier used to pair an LLM rule with the corresponding ground-truth rule.
+  - Stable identifier used to pair an LLM rule with the corresponding reference rule.
 - `xpath`
   - Original XPath string.
 - `parseSuccess`

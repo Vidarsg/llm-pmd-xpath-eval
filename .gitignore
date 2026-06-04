@@ -1,3 +1,6 @@
 docs/
 out/
 tools/**/target/
+targets/
+__pycache__/
+*.py[cod]

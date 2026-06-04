@@ -6,7 +6,7 @@ from pathlib import Path
 
 """Create a compact visual overview of syntax and behavioral experiment results.
 
-The input CSVs are produced by summarize-experiment-vs-ground-truth.py. The
+The input CSVs are produced by summarize-experiment-vs-reference.py. The
 figure is intended for quick comparison of experiment conditions rather than
 for recomputing any metrics.
 
@@ -61,7 +61,7 @@ def short_model_name(model: str) -> str:
     return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "")
 
 
-def ground_truth_only_label(*paths: str) -> str:
+def reference_only_label(*paths: str) -> str:
     text = " ".join(str(path).lower() for path in paths)
     if "jpinpoint" in text:
         return "jPinpoint only"
@@ -123,7 +123,7 @@ def main() -> int:
     )
     parser.add_argument("--out-figure", required=True, help="Output PNG path")
     args = parser.parse_args()
-    gt_only_label = ground_truth_only_label(
+    reference_only_label_text = reference_only_label(
         args.syntax_summary,
         args.behavior_summary,
         args.behavior_per_rule,
@@ -188,8 +188,8 @@ def main() -> int:
         merged_rows, "bothEmptyPct"), dtype=float)
     no_match_pct = np.array(numeric_column(
         merged_rows, "noMatchPct"), dtype=float)
-    gt_only_pct = np.array(numeric_column(
-        merged_rows, "gtOnlyPct"), dtype=float)
+    reference_only_pct = np.array(numeric_column(
+        merged_rows, "referenceOnlyPct"), dtype=float)
     llm_only_pct = np.array(numeric_column(
         merged_rows, "llmOnlyPct"), dtype=float)
     different_files_pct = np.array(numeric_column(
@@ -197,13 +197,13 @@ def main() -> int:
     partial_file_overlap_pct = np.array(
         [
             float(row.get("llmSupersetPct") or 0.0)
-            + float(row.get("gtSupersetPct") or 0.0)
+            + float(row.get("referenceSupersetPct") or 0.0)
             + float(row.get("partialFileOverlapPct") or 0.0)
             for row in merged_rows
         ],
         dtype=float,
     )
-    detailed_no_match_pct = gt_only_pct + llm_only_pct + \
+    detailed_no_match_pct = reference_only_pct + llm_only_pct + \
         different_files_pct + partial_file_overlap_pct
     non_comparable_pct = np.array(numeric_column(
         merged_rows, "nonComparablePct"), dtype=float)
@@ -225,7 +225,7 @@ def main() -> int:
     exact_non_empty_pct = []
     overlap_non_empty_pct = []
     file_level_non_empty_pct = []
-    gt_only_non_empty_pct = []
+    reference_only_non_empty_pct = []
     llm_only_non_empty_pct = []
     different_files_non_empty_pct = []
     partial_file_overlap_non_empty_pct = []
@@ -237,7 +237,7 @@ def main() -> int:
         exact = 0
         overlap = 0
         file_level = 0
-        gt_only = 0
+        reference_only = 0
         llm_only = 0
         different_files = 0
         partial_file_overlap = 0
@@ -250,26 +250,26 @@ def main() -> int:
                 overlap += 1
             elif match_type == "file-level":
                 file_level += 1
-            elif match_type == "gt-only":
-                gt_only += 1
+            elif match_type == "reference-only":
+                reference_only += 1
             elif match_type == "llm-only":
                 llm_only += 1
             elif match_type == "different-files":
                 different_files += 1
-            elif match_type in {"llm-superset", "gt-superset", "partial-file-overlap"}:
+            elif match_type in {"llm-superset", "reference-superset", "partial-file-overlap"}:
                 partial_file_overlap += 1
             elif match_type == "none":
                 unmatched += 1
             try:
                 llm_count = int(row.get("llmFindingCount") or 0)
-                gt_count = int(row.get("groundTruthFindingCount") or 0)
+                reference_count = int(row.get("referenceFindingCount") or 0)
             except ValueError:
                 continue
             if match_type not in {"", "none"}:
                 continue
-            if llm_count == 0 and gt_count > 0:
-                gt_only += 1
-            elif llm_count > 0 and gt_count == 0:
+            if llm_count == 0 and reference_count > 0:
+                reference_only += 1
+            elif llm_count > 0 and reference_count == 0:
                 llm_only += 1
         exact_non_empty_pct.append(
             100.0 * exact / non_empty_total if non_empty_total else 0.0)
@@ -277,8 +277,8 @@ def main() -> int:
             100.0 * overlap / non_empty_total if non_empty_total else 0.0)
         file_level_non_empty_pct.append(
             100.0 * file_level / non_empty_total if non_empty_total else 0.0)
-        gt_only_non_empty_pct.append(
-            100.0 * gt_only / non_empty_total if non_empty_total else 0.0)
+        reference_only_non_empty_pct.append(
+            100.0 * reference_only / non_empty_total if non_empty_total else 0.0)
         llm_only_non_empty_pct.append(
             100.0 * llm_only / non_empty_total if non_empty_total else 0.0)
         different_files_non_empty_pct.append(
@@ -291,7 +291,7 @@ def main() -> int:
     exact_non_empty_pct = np.array(exact_non_empty_pct, dtype=float)
     overlap_non_empty_pct = np.array(overlap_non_empty_pct, dtype=float)
     file_level_non_empty_pct = np.array(file_level_non_empty_pct, dtype=float)
-    gt_only_non_empty_pct = np.array(gt_only_non_empty_pct, dtype=float)
+    reference_only_non_empty_pct = np.array(reference_only_non_empty_pct, dtype=float)
     llm_only_non_empty_pct = np.array(llm_only_non_empty_pct, dtype=float)
     different_files_non_empty_pct = np.array(
         different_files_non_empty_pct, dtype=float)
@@ -360,7 +360,7 @@ def main() -> int:
         (overlap_pct, "Overlap", "#72b7b2"),
         (file_level_pct, "File-level", "#f2cf5b"),
         (both_empty_pct, "Both empty", "#6aaed6"),
-        (gt_only_pct, gt_only_label, "#b279a2"),
+        (reference_only_pct, reference_only_label_text, "#b279a2"),
         (llm_only_pct, "LLM only", "#ff9da6"),
         (partial_file_overlap_pct, "Partial files", "#59a14f"),
         (different_files_pct, "Different files", "#e17c05"),
@@ -387,8 +387,8 @@ def main() -> int:
            width=width, label="File-level", color="#f2cf5b")
     ax.bar(xpos, partial_file_overlap_non_empty_pct,
            width=width, label="Partial files", color="#59a14f")
-    ax.bar(xpos + width, gt_only_non_empty_pct,
-           width=width, label=gt_only_label, color="#b279a2")
+    ax.bar(xpos + width, reference_only_non_empty_pct,
+           width=width, label=reference_only_label_text, color="#b279a2")
     ax.bar(xpos + 2 * width, llm_only_non_empty_pct,
            width=width, label="LLM only", color="#ff9da6")
     ax.bar(xpos + 3 * width, different_files_non_empty_pct + unmatched_non_empty_pct,

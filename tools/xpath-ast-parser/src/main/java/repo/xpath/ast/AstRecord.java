@@ -10,7 +10,7 @@ import java.util.Map;
  * carries both parse status and the normalized AST.</p>
  */
 public final class AstRecord {
-    /** Stable identifier used to match generated and ground-truth XPath rules. */
+    /** Stable identifier used to match generated and reference XPath rules. */
     public Object ruleKey;
 
     /** Original XPath string from the input row. */

@@ -21,7 +21,7 @@ MATCH_COLUMNS = [
 SIMILAR_COLUMNS = [
     "fileLevelCount",
     "llmSupersetCount",
-    "gtSupersetCount",
+    "referenceSupersetCount",
     "partialFileOverlapCount",
 ]
 
@@ -65,7 +65,7 @@ def short_model_name(model: str) -> str:
     return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "") if parts else model
 
 
-def ground_truth_only_label(*paths: str) -> str:
+def reference_only_label(*paths: str) -> str:
     text = " ".join(str(path).lower() for path in paths)
     if "jpinpoint" in text:
         return "jPinpoint only"
@@ -127,7 +127,7 @@ def main() -> int:
     parser.add_argument("--behavior-summary", required=True)
     parser.add_argument("--out-figure", required=True)
     args = parser.parse_args()
-    gt_only_label = ground_truth_only_label(
+    reference_only_label_text = reference_only_label(
         args.syntax_summary, args.behavior_summary, args.out_figure)
 
     try:
@@ -174,7 +174,7 @@ def main() -> int:
                        for row in groups[key]] for key in ordered_keys]
     noncomparable_values = [
         [as_float(row, "nonComparablePct") for row in groups[key]] for key in ordered_keys]
-    gt_only_values = [[as_float(row, "gtOnlyPct")
+    reference_only_values = [[as_float(row, "referenceOnlyPct")
                        for row in groups[key]] for key in ordered_keys]
     llm_only_values = [[as_float(row, "llmOnlyPct")
                         for row in groups[key]] for key in ordered_keys]
@@ -184,7 +184,7 @@ def main() -> int:
     match_mean = [mean(values) for values in match_values]
     similar_mean = [mean(values) for values in similar_values]
     noncomparable_mean = [mean(values) for values in noncomparable_values]
-    gt_only_mean = [mean(values) for values in gt_only_values]
+    reference_only_mean = [mean(values) for values in reference_only_values]
     llm_only_mean = [mean(values) for values in llm_only_values]
 
     operational_err = np.array(
@@ -220,8 +220,8 @@ def main() -> int:
 
     ax = axes[1, 0]
     width = 0.24
-    ax.bar(x - width, gt_only_mean, width=width,
-           label=gt_only_label, color="#d95f02")
+    ax.bar(x - width, reference_only_mean, width=width,
+           label=reference_only_label_text, color="#d95f02")
     ax.bar(x, llm_only_mean, width=width, label="LLM only", color="#7570b3")
     ax.bar(x + width, noncomparable_mean, width=width,
            label="Config/Proc Errors", color="#8c8c8c")
