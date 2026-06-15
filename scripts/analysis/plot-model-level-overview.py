@@ -90,15 +90,13 @@ def model_group_key(row: dict) -> tuple[str, str, str]:
     )
 
 
-def non_empty_denominator(row: dict) -> int:
+def active_denominator(row: dict) -> int:
     total = as_int(row, "totalRules")
-    excluded = as_int(row, "bothEmptyCount") + \
-        as_int(row, "nonComparableCount")
-    return total - excluded
+    return total - as_int(row, "bothEmptyCount")
 
 
 def grouped_pct(row: dict, columns: list[str]) -> float:
-    denominator = non_empty_denominator(row)
+    denominator = active_denominator(row)
     if denominator <= 0:
         return 0.0
     count = sum(as_int(row, name) for name in columns)
@@ -211,7 +209,7 @@ def main() -> int:
            label="Similar", color="#72b7b2")
     ax.errorbar(x, positive_mean, yerr=positive_err,
                 fmt="none", ecolor="#333333", capsize=3, linewidth=1)
-    ax.set_title("Behavioral Correspondence on Non-Empty Cases")
+    ax.set_title("Behavioral Similarity on Active Cases")
     ax.set_ylabel("Mean % across all targets/runs")
     ax.set_ylim(0, 100)
     ax.set_xticks(x)

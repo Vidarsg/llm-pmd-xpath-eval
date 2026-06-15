@@ -82,15 +82,13 @@ def condition_key(row: dict) -> tuple[str, str, str, str, str]:
     )
 
 
-def non_empty_denominator(row: dict) -> int:
+def active_denominator(row: dict) -> int:
     total = as_int(row, "totalRules")
-    excluded = as_int(row, "bothEmptyCount") + \
-        as_int(row, "nonComparableCount")
-    return total - excluded
+    return total - as_int(row, "bothEmptyCount")
 
 
 def grouped_pct(row: dict, columns: list[str]) -> float:
-    denominator = non_empty_denominator(row)
+    denominator = active_denominator(row)
     if denominator <= 0:
         return 0.0
     count = sum(as_int(row, name) for name in columns)
@@ -190,7 +188,7 @@ def main() -> int:
 
     ax = axes[0, 1]
     image = ax.imshow(heatmap, cmap="Blues", vmin=0, vmax=100, aspect="auto")
-    ax.set_title("Behavioral Correspondence by Target and Model")
+    ax.set_title("Behavioral Similarity by Target and Model")
     ax.set_xticks(np.arange(len(models)))
     ax.set_xticklabels([short_model_name(model)
                        for model in models], rotation=25, ha="right")
@@ -207,7 +205,7 @@ def main() -> int:
     ax = axes[1, 0]
     ax.barh(x, match, label="Match", color="#4c78a8")
     ax.barh(x, similar, left=match, label="Similar", color="#72b7b2")
-    ax.set_title("Behavioral Correspondence by Target")
+    ax.set_title("Behavioral Similarity by Target")
     ax.set_xlabel("Mean % across all models/runs")
     ax.set_xlim(0, 100)
     ax.set_yticks(x)
