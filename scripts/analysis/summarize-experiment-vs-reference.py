@@ -9,7 +9,7 @@ from pathlib import Path
 
 The script combines validation outputs, PMD JSON reports, catalog metadata, and
 optional structural-similarity rows into CSV/Markdown tables suitable for
-analysis and thesis reporting.
+analysis and reporting.
 
 Usage example:
   python scripts/analysis/summarize-experiment-vs-reference.py \
@@ -248,7 +248,7 @@ def all_spans_overlap(left: list[tuple[int, int, int, int]], right: list[tuple[i
 
 
 def classify_behavior(llm_report: dict, reference_report: dict) -> str:
-    """Classify behavioral correspondence between one LLM rule report and one reference report."""
+    """Classify behavioral similarity between one LLM rule report and one reference report."""
     # Behavioral comparison only makes sense when both PMD runs completed well
     # enough to produce trustworthy violation spans.
     if (
@@ -299,7 +299,7 @@ def report_finding_count(report: dict) -> int:
 
 
 def row_group_key(row: dict) -> tuple[str, str, str, str, str]:
-    """Group rows into one summary bucket for the thesis tables."""
+    """Group rows into one summary bucket for the tables."""
     return (
         Path(str(row["target"])).name,
         str(row["model"]),
@@ -474,16 +474,19 @@ def load_structural_rows(
 
     structural_files = sorted(
         experiment_root.rglob("structural-similarity.jsonl"))
-    specs_by_generated_jsonl = load_run_specs_by_generated_jsonl(experiment_root)
+    specs_by_generated_jsonl = load_run_specs_by_generated_jsonl(
+        experiment_root)
     rows = []
     for structural_file in structural_files:
         spec = find_associated_run_spec(structural_file, experiment_root)
         if spec is None:
             generated_jsonl = structural_generated_jsonl_path(structural_file)
             if generated_jsonl is not None:
-                spec = specs_by_generated_jsonl.get(normalize_resolved_path(generated_jsonl))
+                spec = specs_by_generated_jsonl.get(
+                    normalize_resolved_path(generated_jsonl))
         if spec is None:
-            spec = infer_shared_generation_spec(structural_file, experiment_root)
+            spec = infer_shared_generation_spec(
+                structural_file, experiment_root)
         for row in read_json_records(structural_file):
             enriched = dict(row)
             # Structural result rows produced in batch mode do not always carry
@@ -505,7 +508,7 @@ def write_structural_similarity_summaries(
     out_dir: Path,
     label: str,
 ) -> None:
-    """Summarize structural-similarity rows into overall, per-condition, and per-rule thesis tables."""
+    """Summarize structural-similarity rows into overall, per-condition, and per-rule tables."""
     rows, inferred_label = load_structural_rows(
         structural_results_path, experiment_root)
     if not label:
@@ -672,7 +675,7 @@ def write_structural_similarity_summaries(
 
 
 def main() -> int:
-    """Load experiment outputs, compare them to reference, and emit thesis-ready summary tables."""
+    """Load experiment outputs, compare them to reference, and emit summary tables."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--aggregated-results", required=True,
                     help="Path to aggregated-results.jsonl")
@@ -766,7 +769,8 @@ def main() -> int:
             )
             continue
         reference_index, reference_reports_dir = reference
-        reference_row = reference_index.get(str(mapped_rule_id)) or reference_index.get(str(row["ruleKey"]))
+        reference_row = reference_index.get(
+            str(mapped_rule_id)) or reference_index.get(str(row["ruleKey"]))
         if reference_row is None:
             # Without a reference record there is no meaningful behavioral
             # comparison, but the row still counts toward the condition total.
@@ -821,7 +825,8 @@ def main() -> int:
             str(mapped_rule_id),
             str(row["ruleKey"]),
         )
-        reference_report = parse_report_violations(reference_report_path, report_cache)
+        reference_report = parse_report_violations(
+            reference_report_path, report_cache)
         match_type = classify_behavior(llm_report, reference_report)
         llm_finding_count = report_finding_count(llm_report)
         reference_finding_count = report_finding_count(reference_report)
@@ -880,7 +885,8 @@ def main() -> int:
     ]
     for group, counts in sorted(behavior_counters.items()):
         total = counts["totalRules"]
-        no_match_count = sum(counts[match_type] for match_type in no_match_types)
+        no_match_count = sum(counts[match_type]
+                             for match_type in no_match_types)
         behavior_rows.append(
             {
                 "target": group[0],

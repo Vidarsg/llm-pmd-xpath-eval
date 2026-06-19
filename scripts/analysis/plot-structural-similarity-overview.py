@@ -16,6 +16,20 @@ Usage example:
     --out-figure out/analysis-summary/structural_similarity_overview.png
 """
 
+MODEL_COLORS = {
+    "Gemma-4-31B": "#59a14f",
+    "Mistral-Large": "#f28e2b",
+    "Qwen3.5-122B": "#e15759",
+    "gpt-oss-120b": "#4e79a7",
+}
+
+MODEL_ORDER = [
+    "Gemma-4-31B",
+    "Mistral-Large",
+    "Qwen3.5-122B",
+    "gpt-oss-120b",
+]
+
 
 def read_csv_rows(path: Path) -> list[dict]:
     """Read a CSV summary file as dictionaries."""
@@ -26,6 +40,30 @@ def read_csv_rows(path: Path) -> list[dict]:
 def ensure_parent(path: Path) -> None:
     """Create the output directory before saving the plot."""
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def save_panel(fig, ax, path: Path) -> None:
+    ensure_parent(path)
+    axes_visibility = [(figure_ax, figure_ax.get_visible())
+                       for figure_ax in fig.axes]
+    for figure_ax, _visible in axes_visibility:
+        figure_ax.set_visible(figure_ax is ax)
+
+    suptitle = getattr(fig, "_suptitle", None)
+    suptitle_visible = suptitle.get_visible() if suptitle is not None else None
+    if suptitle is not None:
+        suptitle.set_visible(False)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    bbox = ax.get_tightbbox(renderer).expanded(1.03, 1.06)
+    bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(path, dpi=220, bbox_inches=bbox_inches)
+
+    for figure_ax, visible in axes_visibility:
+        figure_ax.set_visible(visible)
+    if suptitle is not None and suptitle_visible is not None:
+        suptitle.set_visible(suptitle_visible)
 
 
 def percentile(sorted_values: list[float], p: float) -> float:
@@ -48,7 +86,9 @@ def short_model_name(model: str) -> str:
     name = model.strip().replace("\\", "/")
     aliases = {
         "openai/openai/gpt-oss-120b": "gpt-oss-120b",
+        "openai/gpt-oss-120b": "gpt-oss-120b",
         "openai/Qwen/Qwen3.5-122B-A10B-FP8": "Qwen3.5-122B",
+        "Qwen/Qwen3.5-122B-A10B-FP8": "Qwen3.5-122B",
         "openai/Qwen/Qwen3.6-27B-FP8": "Qwen3.6-27B",
         "moonshotai/Kimi-K2.6": "Kimi-K2.6",
         "mistralai/Mistral-Large-3-675B-Instruct-2512-NVFP4": "Mistral-Large",
@@ -61,6 +101,18 @@ def short_model_name(model: str) -> str:
     if not parts:
         return model
     return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "")
+
+
+def model_color(model: str) -> str:
+    return MODEL_COLORS.get(short_model_name(model), "#4c9f70")
+
+
+def model_sort_key(model: str) -> tuple[int, str]:
+    short_name = short_model_name(model)
+    try:
+        return (MODEL_ORDER.index(short_name), short_name)
+    except ValueError:
+        return (len(MODEL_ORDER), short_name)
 
 
 def condition_label(
@@ -91,6 +143,9 @@ def main() -> int:
     parser.add_argument("--structural-per-rule", required=True,
                         help="Path to structural_similarity_per_rule.csv")
     parser.add_argument("--out-figure", required=True, help="Output PNG path")
+    parser.add_argument("--panel-parseable")
+    parser.add_argument("--panel-score-distribution")
+    parser.add_argument("--panel-components")
     args = parser.parse_args()
 
     try:
@@ -134,7 +189,7 @@ def main() -> int:
         grouped[("all", "all", "all")] = comparable_rows
 
     ordered_keys = sorted(all_grouped.keys(), key=lambda item: (
-        item[0], item[1], item[2]))
+        model_sort_key(item[0]), item[1], item[2]))
     unique_models = {key[0] for key in ordered_keys}
     unique_prompts = {key[1] for key in ordered_keys}
     unique_temperatures = {str(key[2]) for key in ordered_keys}
@@ -189,7 +244,10 @@ def main() -> int:
                              if overall_scores else 0.0)
 
     temperatures = sorted({str(key[2]) for key in ordered_keys})
-    model_prompt_rows = sorted({(key[0], key[1]) for key in ordered_keys})
+    model_prompt_rows = sorted(
+        {(key[0], key[1]) for key in ordered_keys},
+        key=lambda item: (model_sort_key(item[0]), item[1]),
+    )
     heatmap = np.full((len(model_prompt_rows), len(temperatures)), np.nan)
     for key, median in zip(ordered_keys, median_scores):
         heatmap[model_prompt_rows.index(
@@ -201,7 +259,11 @@ def main() -> int:
         fig_width, fig_height), constrained_layout=True)
 
     ax = axes[0, 0]
-    ax.bar(np.arange(len(labels)), comparable_pct, color="#4c9f70")
+    ax.bar(
+        np.arange(len(labels)),
+        comparable_pct,
+        color=[model_color(key[0]) for key in ordered_keys],
+    )
     ax.set_title("Generated XPath Rules That Could Be Parsed")
     ax.set_ylabel("Percent")
     ax.set_ylim(0, 100)
@@ -270,6 +332,12 @@ def main() -> int:
     out_figure = Path(args.out_figure)
     ensure_parent(out_figure)
     fig.savefig(out_figure, dpi=220, bbox_inches="tight")
+    if args.panel_parseable:
+        save_panel(fig, axes[0, 0], Path(args.panel_parseable))
+    if args.panel_score_distribution:
+        save_panel(fig, axes[0, 1], Path(args.panel_score_distribution))
+    if args.panel_components:
+        save_panel(fig, axes[1, 0], Path(args.panel_components))
     print(f"Wrote figure to {out_figure}")
     return 0
 

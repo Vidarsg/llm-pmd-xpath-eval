@@ -14,15 +14,29 @@ Usage example:
 
 
 MATCH_COLUMNS = [
-    "exactCount",
-    "overlapCount",
+    ("exactCount",),
+    ("overlapCount",),
 ]
 
 SIMILAR_COLUMNS = [
-    "fileLevelCount",
-    "llmSupersetCount",
-    "referenceSupersetCount",
-    "partialFileOverlapCount",
+    ("fileLevelCount",),
+    ("llmSupersetCount",),
+    ("referenceSupersetCount", "gtSupersetCount"),
+    ("partialFileOverlapCount",),
+]
+
+MODEL_COLORS = {
+    "Gemma-4-31B": "#59a14f",
+    "Mistral-Large": "#f28e2b",
+    "Qwen3.5-122B": "#e15759",
+    "gpt-oss-120b": "#4e79a7",
+}
+
+MODEL_ORDER = [
+    "Gemma-4-31B",
+    "Mistral-Large",
+    "Qwen3.5-122B",
+    "gpt-oss-120b",
 ]
 
 
@@ -33,6 +47,30 @@ def read_csv_rows(path: Path) -> list[dict]:
 
 def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def save_panel(fig, ax, path: Path) -> None:
+    ensure_parent(path)
+    axes_visibility = [(figure_ax, figure_ax.get_visible())
+                       for figure_ax in fig.axes]
+    for figure_ax, _visible in axes_visibility:
+        figure_ax.set_visible(figure_ax is ax)
+
+    suptitle = getattr(fig, "_suptitle", None)
+    suptitle_visible = suptitle.get_visible() if suptitle is not None else None
+    if suptitle is not None:
+        suptitle.set_visible(False)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    bbox = ax.get_tightbbox(renderer).expanded(1.03, 1.06)
+    bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(path, dpi=220, bbox_inches=bbox_inches)
+
+    for figure_ax, visible in axes_visibility:
+        figure_ax.set_visible(visible)
+    if suptitle is not None and suptitle_visible is not None:
+        suptitle.set_visible(suptitle_visible)
 
 
 def as_float(row: dict, name: str) -> float:
@@ -49,6 +87,28 @@ def as_int(row: dict, name: str) -> int:
         return 0
 
 
+def as_float_any(row: dict, *names: str) -> float:
+    for name in names:
+        value = row.get(name)
+        if value not in (None, ""):
+            try:
+                return float(value)
+            except ValueError:
+                continue
+    return 0.0
+
+
+def count_from_aliases(row: dict, aliases: tuple[str, ...]) -> int:
+    for name in aliases:
+        value = row.get(name)
+        if value not in (None, ""):
+            try:
+                return int(float(value))
+            except ValueError:
+                continue
+    return 0
+
+
 def short_model_name(model: str) -> str:
     name = model.strip().replace("\\", "/")
     aliases = {
@@ -63,6 +123,18 @@ def short_model_name(model: str) -> str:
         return aliases[name]
     parts = [part for part in name.split("/") if part]
     return parts[-1].replace("-Instruct-2512", "").replace("-NVFP4", "").replace("-FP8", "") if parts else model
+
+
+def model_color(model: str) -> str:
+    return MODEL_COLORS.get(short_model_name(model), "#4c9f70")
+
+
+def model_sort_key(model: str) -> tuple[int, str]:
+    short_name = short_model_name(model)
+    try:
+        return (MODEL_ORDER.index(short_name), short_name)
+    except ValueError:
+        return (len(MODEL_ORDER), short_name)
 
 
 def reference_only_label(*paths: str) -> str:
@@ -90,16 +162,17 @@ def model_group_key(row: dict) -> tuple[str, str, str]:
     )
 
 
-def active_denominator(row: dict) -> int:
+def non_empty_denominator(row: dict) -> int:
     total = as_int(row, "totalRules")
-    return total - as_int(row, "bothEmptyCount")
+    excluded = as_int(row, "bothEmptyCount") + as_int(row, "nonComparableCount")
+    return total - excluded
 
 
 def grouped_pct(row: dict, columns: list[str]) -> float:
-    denominator = active_denominator(row)
+    denominator = non_empty_denominator(row)
     if denominator <= 0:
         return 0.0
-    count = sum(as_int(row, name) for name in columns)
+    count = sum(count_from_aliases(row, aliases) for aliases in columns)
     return 100.0 * count / denominator
 
 
@@ -124,6 +197,9 @@ def main() -> int:
     parser.add_argument("--syntax-summary", required=True)
     parser.add_argument("--behavior-summary", required=True)
     parser.add_argument("--out-figure", required=True)
+    parser.add_argument("--panel-operational")
+    parser.add_argument("--panel-behavioral")
+    parser.add_argument("--panel-failure")
     args = parser.parse_args()
     reference_only_label_text = reference_only_label(
         args.syntax_summary, args.behavior_summary, args.out_figure)
@@ -155,7 +231,7 @@ def main() -> int:
             "No overlapping model conditions found in summary CSVs.")
 
     ordered_keys = sorted(groups, key=lambda key: (
-        short_model_name(key[0]), key[1], key[2]))
+        model_sort_key(key[0]), key[1], key[2]))
     labels = [
         f"{short_model_name(model)}\n{prompt}"
         for model, prompt, _temperature in ordered_keys
@@ -172,7 +248,7 @@ def main() -> int:
                        for row in groups[key]] for key in ordered_keys]
     noncomparable_values = [
         [as_float(row, "nonComparablePct") for row in groups[key]] for key in ordered_keys]
-    reference_only_values = [[as_float(row, "referenceOnlyPct")
+    reference_only_values = [[as_float_any(row, "referenceOnlyPct", "gtOnlyPct")
                        for row in groups[key]] for key in ordered_keys]
     llm_only_values = [[as_float(row, "llmOnlyPct")
                         for row in groups[key]] for key in ordered_keys]
@@ -196,7 +272,7 @@ def main() -> int:
 
     ax = axes[0, 0]
     ax.bar(x, operational_mean, yerr=operational_err,
-           capsize=3, color="#4c9f70")
+           capsize=3, color=[model_color(key[0]) for key in ordered_keys])
     ax.set_title("Operational Validity by Model")
     ax.set_ylabel("Mean % across all targets/runs")
     ax.set_ylim(0, 100)
@@ -236,6 +312,12 @@ def main() -> int:
     out_figure = Path(args.out_figure)
     ensure_parent(out_figure)
     fig.savefig(out_figure, dpi=220, bbox_inches="tight")
+    if args.panel_operational:
+        save_panel(fig, axes[0, 0], Path(args.panel_operational))
+    if args.panel_behavioral:
+        save_panel(fig, axes[0, 1], Path(args.panel_behavioral))
+    if args.panel_failure:
+        save_panel(fig, axes[1, 0], Path(args.panel_failure))
     print(f"Wrote figure to {out_figure}")
     return 0
 

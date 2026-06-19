@@ -3,7 +3,7 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
-"""Plot rule-level difficulty from behavioral correspondence per-rule rows.
+"""Plot rule-level difficulty from behavioral similarity per-rule rows.
 
 Usage example:
   python scripts/analysis/plot-rule-level-overview.py \
@@ -21,6 +21,7 @@ SIMILAR_TYPES = {
     "file-level",
     "llm-superset",
     "reference-superset",
+    "gt-superset",
     "partial-file-overlap",
 }
 
@@ -32,6 +33,30 @@ def read_csv_rows(path: Path) -> list[dict]:
 
 def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def save_panel(fig, ax, path: Path) -> None:
+    ensure_parent(path)
+    axes_visibility = [(figure_ax, figure_ax.get_visible())
+                       for figure_ax in fig.axes]
+    for figure_ax, _visible in axes_visibility:
+        figure_ax.set_visible(figure_ax is ax)
+
+    suptitle = getattr(fig, "_suptitle", None)
+    suptitle_visible = suptitle.get_visible() if suptitle is not None else None
+    if suptitle is not None:
+        suptitle.set_visible(False)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    bbox = ax.get_tightbbox(renderer).expanded(1.03, 1.06)
+    bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(path, dpi=220, bbox_inches=bbox_inches)
+
+    for figure_ax, visible in axes_visibility:
+        figure_ax.set_visible(visible)
+    if suptitle is not None and suptitle_visible is not None:
+        suptitle.set_visible(suptitle_visible)
 
 
 def short_rule_name(rule: str, max_len: int = 34) -> str:
@@ -54,6 +79,17 @@ def as_int(row: dict, name: str) -> int:
         return 0
 
 
+def as_int_any(row: dict, *names: str) -> int:
+    for name in names:
+        value = row.get(name)
+        if value not in (None, ""):
+            try:
+                return int(float(value))
+            except ValueError:
+                continue
+    return 0
+
+
 def rule_key(row: dict) -> tuple[str, str, str]:
     return (
         str(row.get("ruleKey", "")),
@@ -73,6 +109,10 @@ def main() -> int:
     parser.add_argument("--behavior-per-rule", required=True)
     parser.add_argument("--out-figure", required=True)
     parser.add_argument("--top-n", type=int, default=10)
+    parser.add_argument("--panel-rule-similarity")
+    parser.add_argument("--panel-category-similarity")
+    parser.add_argument("--panel-reference-only")
+    parser.add_argument("--panel-errors")
     args = parser.parse_args()
     reference_only_label_text = reference_only_label(
         args.behavior_per_rule, args.out_figure)
@@ -108,12 +148,18 @@ def main() -> int:
         similar = sum(1 for row in group_rows if row.get(
             "matchType") in SIMILAR_TYPES)
         positive = match + similar
-        reference_only = sum(1 for row in group_rows if row.get(
-            "matchType") == "reference-only")
+        reference_only = sum(
+            1
+            for row in group_rows
+            if row.get("matchType") in {"reference-only", "gt-only"}
+        )
         llm_only = sum(1 for row in group_rows if row.get(
             "matchType") == "llm-only")
-        reference_nonempty = sum(1 for row in group_rows if as_int(
-            row, "referenceFindingCount") > 0)
+        reference_nonempty = sum(
+            1
+            for row in group_rows
+            if as_int_any(row, "referenceFindingCount", "groundTruthFindingCount") > 0
+        )
         llm_nonempty = sum(1 for row in group_rows if as_int(
             row, "llmFindingCount") > 0)
         rule_stats.append(
@@ -217,7 +263,7 @@ def main() -> int:
                 label="Similar", color="#72b7b2")
         ax.set_title(title)
         ax.set_xlabel(
-            "behavioral correspondence % of non-empty comparable cases")
+            "behavioral similarity % of non-empty comparable cases")
         ax.set_xlim(0, 100)
         ax.set_yticks(y)
         ax.set_yticklabels(labels, fontsize=8)
@@ -244,7 +290,7 @@ def main() -> int:
                 label="Similar", color="#72b7b2")
         ax.set_title(title)
         ax.set_xlabel(
-            "behavioral correspondence % of non-empty comparable cases")
+            "behavioral similarity % of non-empty comparable cases")
         ax.set_xlim(0, 100)
         ax.set_yticks(y)
         ax.set_yticklabels(labels, fontsize=8)
@@ -263,7 +309,7 @@ def main() -> int:
     stacked_agreement_rules(
         axes[0, 0],
         easiest,
-        "Rules with the Highest Behavioral Correspondence",
+        "Rules with the Highest Behavioral Similarity",
     )
     if category_stats:
         stacked_agreement_categories(
@@ -294,6 +340,14 @@ def main() -> int:
     out_figure = Path(args.out_figure)
     ensure_parent(out_figure)
     fig.savefig(out_figure, dpi=220, bbox_inches="tight")
+    if args.panel_rule_similarity:
+        save_panel(fig, axes[0, 0], Path(args.panel_rule_similarity))
+    if args.panel_category_similarity and category_stats:
+        save_panel(fig, axes[0, 1], Path(args.panel_category_similarity))
+    if args.panel_reference_only:
+        save_panel(fig, axes[1, 0], Path(args.panel_reference_only))
+    if args.panel_errors:
+        save_panel(fig, axes[1, 1], Path(args.panel_errors))
     print(f"Wrote figure to {out_figure}")
     return 0
 

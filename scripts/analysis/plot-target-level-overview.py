@@ -14,15 +14,15 @@ Usage example:
 
 
 MATCH_COLUMNS = [
-    "exactCount",
-    "overlapCount",
+    ("exactCount",),
+    ("overlapCount",),
 ]
 
 SIMILAR_COLUMNS = [
-    "fileLevelCount",
-    "llmSupersetCount",
-    "referenceSupersetCount",
-    "partialFileOverlapCount",
+    ("fileLevelCount",),
+    ("llmSupersetCount",),
+    ("referenceSupersetCount", "gtSupersetCount"),
+    ("partialFileOverlapCount",),
 ]
 
 
@@ -33,6 +33,30 @@ def read_csv_rows(path: Path) -> list[dict]:
 
 def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def save_panel(fig, ax, path: Path) -> None:
+    ensure_parent(path)
+    axes_visibility = [(figure_ax, figure_ax.get_visible())
+                       for figure_ax in fig.axes]
+    for figure_ax, _visible in axes_visibility:
+        figure_ax.set_visible(figure_ax is ax)
+
+    suptitle = getattr(fig, "_suptitle", None)
+    suptitle_visible = suptitle.get_visible() if suptitle is not None else None
+    if suptitle is not None:
+        suptitle.set_visible(False)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    bbox = ax.get_tightbbox(renderer).expanded(1.03, 1.06)
+    bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(path, dpi=220, bbox_inches=bbox_inches)
+
+    for figure_ax, visible in axes_visibility:
+        figure_ax.set_visible(visible)
+    if suptitle is not None and suptitle_visible is not None:
+        suptitle.set_visible(suptitle_visible)
 
 
 def as_float(row: dict, name: str) -> float:
@@ -47,6 +71,28 @@ def as_int(row: dict, name: str) -> int:
         return int(float(row.get(name) or 0))
     except ValueError:
         return 0
+
+
+def as_float_any(row: dict, *names: str) -> float:
+    for name in names:
+        value = row.get(name)
+        if value not in (None, ""):
+            try:
+                return float(value)
+            except ValueError:
+                continue
+    return 0.0
+
+
+def count_from_aliases(row: dict, aliases: tuple[str, ...]) -> int:
+    for name in aliases:
+        value = row.get(name)
+        if value not in (None, ""):
+            try:
+                return int(float(value))
+            except ValueError:
+                continue
+    return 0
 
 
 def short_model_name(model: str) -> str:
@@ -82,16 +128,17 @@ def condition_key(row: dict) -> tuple[str, str, str, str, str]:
     )
 
 
-def active_denominator(row: dict) -> int:
+def non_empty_denominator(row: dict) -> int:
     total = as_int(row, "totalRules")
-    return total - as_int(row, "bothEmptyCount")
+    excluded = as_int(row, "bothEmptyCount") + as_int(row, "nonComparableCount")
+    return total - excluded
 
 
 def grouped_pct(row: dict, columns: list[str]) -> float:
-    denominator = active_denominator(row)
+    denominator = non_empty_denominator(row)
     if denominator <= 0:
         return 0.0
-    count = sum(as_int(row, name) for name in columns)
+    count = sum(count_from_aliases(row, aliases) for aliases in columns)
     return 100.0 * count / denominator
 
 
@@ -110,6 +157,9 @@ def main() -> int:
     parser.add_argument("--syntax-summary", required=True)
     parser.add_argument("--behavior-summary", required=True)
     parser.add_argument("--out-figure", required=True)
+    parser.add_argument("--panel-target-behavioral")
+    parser.add_argument("--panel-target-model")
+    parser.add_argument("--panel-target-failure")
     args = parser.parse_args()
     reference_only_label_text = reference_only_label(
         args.syntax_summary, args.behavior_summary, args.out_figure)
@@ -158,8 +208,8 @@ def main() -> int:
                     for row in target_groups[target]]) for target in targets]
     positive = [mean([positive_non_empty_pct(row)
                      for row in target_groups[target]]) for target in targets]
-    reference_only = [mean([as_float(row, "referenceOnlyPct")
-                    for row in target_groups[target]]) for target in targets]
+    reference_only = [mean([as_float_any(row, "referenceOnlyPct", "gtOnlyPct")
+                            for row in target_groups[target]]) for target in targets]
     llm_only = [mean([as_float(row, "llmOnlyPct")
                      for row in target_groups[target]]) for target in targets]
     noncomparable = [mean([as_float(row, "nonComparablePct")
@@ -220,7 +270,7 @@ def main() -> int:
     ax.barh(x, llm_only, height=width, label="LLM only", color="#7570b3")
     ax.barh(x + width, noncomparable, height=width,
             label="Config/Proc Errors", color="#8c8c8c")
-    ax.set_title("Target-Level Failure Pressure")
+    ax.set_title("Target-Level Failure Rate")
     ax.set_xlabel("Mean % of all rules")
     ax.set_xlim(0, 100)
     ax.set_yticks(x)
@@ -232,6 +282,12 @@ def main() -> int:
     out_figure = Path(args.out_figure)
     ensure_parent(out_figure)
     fig.savefig(out_figure, dpi=220, bbox_inches="tight")
+    if args.panel_target_behavioral:
+        save_panel(fig, axes[1, 0], Path(args.panel_target_behavioral))
+    if args.panel_target_model:
+        save_panel(fig, axes[0, 1], Path(args.panel_target_model))
+    if args.panel_target_failure:
+        save_panel(fig, axes[1, 1], Path(args.panel_target_failure))
     print(f"Wrote figure to {out_figure}")
     return 0
 

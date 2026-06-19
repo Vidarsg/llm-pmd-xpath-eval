@@ -1,6 +1,6 @@
 # LLM-Generated PMD XPath Rule Evaluation
 
-This repository contains a local evaluation framework for generating PMD Java XPath rules with large language models (LLMs), validating the generated rules with PMD, and comparing them against reference XPath rules. It supports the final thesis experiments across official PMD rules, custom jPinpoint rules, multiple Java target repositories, multiple models, zero-shot and few-shot prompting, repeated runs, behavioral correspondence, and structural XPath similarity.
+This repository contains a local evaluation framework for generating PMD Java XPath rules with large language models (LLMs), validating the generated rules with PMD, and comparing them against reference XPath rules. It supports the final thesis experiments across official PMD rules, custom jPinpoint rules, multiple Java target repositories, multiple models, zero-shot and few-shot prompting, with structural and behavioral similarity.
 
 ## Prerequisites
 
@@ -253,7 +253,7 @@ python .\scripts\analysis\summarize-experiment-vs-reference.py `
   --out-dir .\out\analysis-summary\Official-PMD_AllTargets_AllModels_Zero-Shot
 ```
 
-Use `--reference-root .\out\custom-runs` for jPinpoint summaries. The summarizer accepts both `catalog-run_<target>/results.jsonl` and `custom-run_<target>/results.jsonl` layouts. Output filenames still use `behavioral_agreement_*` for compatibility with earlier scripts, but the thesis text refers to the metric as behavioral correspondence.
+Use `--reference-root .\out\custom-runs` for jPinpoint summaries. The summarizer accepts both `catalog-run_<target>/results.jsonl` and `custom-run_<target>/results.jsonl` layouts. Output filenames still use `behavioral_agreement_*` for compatibility with earlier scripts, but the thesis text refers to the metric as behavioral similarity.
 
 Common summary outputs:
 
